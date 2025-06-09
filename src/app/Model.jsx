@@ -6,29 +6,47 @@ import * as THREE from 'three'
 
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-
+import simplexNoiseGLSL from '../r3f-gist/shader/cginc/noise/simplexNoise.glsl?raw'  //
+import utilityGLSL from '../r3f-gist/shader/cginc/utility.glsl?raw'
 
 // Custom shader material for normal visualization
 const NormalShaderMaterial = {
     uniforms: {
         time: { value: 0 },
         intensity: { value: 1.0 },
-        triScale: { value: 1.0 }
+        triScale: { value: 1.0 },
+        mosaic: { value: 0 },
     },
     vertexShader: /* glsl */`
+        ${simplexNoiseGLSL}
+        ${utilityGLSL}
 
         uniform float triScale;
         varying vec3 vNormal;
         varying vec3 vPosition;
         attribute vec3 center;
+        uniform float mosaic;
+        uniform float time;
+        float PI = 3.14159265358979323846;
 
-        void main() {
+        void main() {   
             vNormal = normal;
             vPosition = position;
 
             vec3 pos = position;
-
             pos = (pos - center) * triScale + center;
+
+            float noise = simplexNoise4d(vec4(pos *0.02, time * 0.5 ));
+
+            float rotate = noise * PI * 0.1;
+
+            pos = rotate3D(pos, vec3(1, 0, 0), rotate);
+            pos = rotate3D(pos, vec3(0, 1, 0), rotate);
+            pos = rotate3D(pos, vec3(0, 1, 1), rotate);
+
+            float scale = 1. + noise * 0.1;
+
+            pos *= scale;
 
 
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -51,7 +69,7 @@ export default function Model() {
 
     const [mergedMesh, setMergedMesh] = useState(null)
 
-    const { intensity, triScale } = useControls('Normal Material', {
+    const { intensity, triScale, mosaic } = useControls('Normal Material', {
         intensity: {
             value: 1.0,
             min: 0.0,
@@ -63,6 +81,12 @@ export default function Model() {
             min: 0.0,
             max: 1.0,
             step: 0.1
+        },
+        mosaic: {
+            value: 0,
+            min: 0,
+            max: 1,
+            step: 0.01
         }
     });
 
@@ -122,6 +146,8 @@ export default function Model() {
         }
         if (materialRef.current) {
             materialRef.current.uniforms.triScale.value = triScale;
+            materialRef.current.uniforms.mosaic.value = mosaic;
+            materialRef.current.uniforms.time.value = state.clock.elapsedTime;
         }
     });
 
