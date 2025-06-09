@@ -12,16 +12,26 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 const NormalShaderMaterial = {
     uniforms: {
         time: { value: 0 },
-        intensity: { value: 1.0 }
+        intensity: { value: 1.0 },
+        triScale: { value: 1.0 }
     },
     vertexShader: /* glsl */`
+
+        uniform float triScale;
         varying vec3 vNormal;
         varying vec3 vPosition;
-        
+        attribute vec3 center;
+
         void main() {
-            vNormal = normalize(normalMatrix * normal);
+            vNormal = normal;
             vPosition = position;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+
+            vec3 pos = position;
+
+            pos = (pos - center) * triScale + center;
+
+
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }
     `,
     fragmentShader: /* glsl */`
@@ -41,17 +51,22 @@ export default function Model() {
 
     const [mergedMesh, setMergedMesh] = useState(null)
 
-    const { intensity } = useControls('Normal Material', {
+    const { intensity, triScale } = useControls('Normal Material', {
         intensity: {
             value: 1.0,
             min: 0.0,
             max: 2.0,
             step: 0.1
+        },
+        triScale: {
+            value: 1.0,
+            min: 0.0,
+            max: 1.0,
+            step: 0.1
         }
     });
 
     useEffect(() => {
-
         const loader = new FBXLoader()
         loader.load('/free_head.fbx', (fbx) => {
 
@@ -71,12 +86,28 @@ export default function Model() {
             });
 
             if (geometries.length > 0) {
-                const mergedGeometry = mergeGeometries(geometries, false)
+                const mergedGeometry = mergeGeometries(geometries, false).toNonIndexed()
 
                 mergedGeometry.computeBoundingBox()
                 const center = new THREE.Vector3()
                 mergedGeometry.boundingBox.getCenter(center)
                 mergedGeometry.translate(-center.x, -center.y, -center.z)
+
+                const pos = mergedGeometry.attributes.position.array
+
+                // calculate center position of each triangle
+                let centers = []
+                for(let i = 0; i < pos.length; i += 9) {
+                    const centerX = (pos[i] + pos[i + 3] + pos[i + 6]) / 3
+                    const centerY = (pos[i + 1] + pos[i + 4] + pos[i + 7]) / 3
+                    const centerZ = (pos[i + 2] + pos[i + 5] + pos[i + 8]) / 3
+
+                    centers.push(centerX, centerY, centerZ)
+                    centers.push(centerX, centerY, centerZ)
+                    centers.push(centerX, centerY, centerZ)
+                }
+
+                mergedGeometry.setAttribute('center', new THREE.BufferAttribute(new Float32Array(centers), 3))
 
                 const merged = new THREE.Mesh(mergedGeometry, materialRef.current)
                 setMergedMesh(merged)
@@ -87,8 +118,7 @@ export default function Model() {
 
     useFrame((state) => {
         if (materialRef.current) {
-            // materialRef.current.uniforms.time.value = state.clock.elapsedTime;
-            // materialRef.current.uniforms.intensity.value = intensity;
+            materialRef.current.uniforms.triScale.value = triScale;
         }
     });
 
