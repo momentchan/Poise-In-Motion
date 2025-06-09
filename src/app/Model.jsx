@@ -41,7 +41,7 @@ const NormalShaderMaterial = {
         void main() {
     
             gl_FragColor = vec4(vNormal, 1.0);
-            gl_FragColor = vec4(normalize(vNormal) * 0.5 + 0.5, 1.0);
+            // gl_FragColor = vec4(normalize(vNormal) * 0.5 + 0.5, 1.0);
         }
     `
 };
@@ -117,6 +117,9 @@ export default function Model() {
 
 
     useFrame((state) => {
+        if (mergedMesh) {
+            // mergedMesh.position.x = Math.sin(state.clock.elapsedTime * 2) * 1
+        }
         if (materialRef.current) {
             materialRef.current.uniforms.triScale.value = triScale;
         }
