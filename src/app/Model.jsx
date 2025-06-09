@@ -1,8 +1,12 @@
 import { useFBX } from "@react-three/drei";
-import { useFrame } from '@react-three/fiber'
-import { useRef, useEffect } from 'react'
+import { useFrame, useLoader } from '@react-three/fiber'
+import { useRef, useEffect, useState } from 'react'
 import { useControls } from 'leva'
 import * as THREE from 'three'
+
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+
 
 // Custom shader material for normal visualization
 const NormalShaderMaterial = {
@@ -34,9 +38,8 @@ const NormalShaderMaterial = {
 
 export default function Model() {
     const materialRef = useRef()
-    const meshRef = useRef()
-    const fbx = useFBX('/free_head.fbx')
-    const groupRef = useRef()
+
+    const [mergedMesh, setMergedMesh] = useState(null)
 
     const { intensity } = useControls('Normal Material', {
         intensity: {
@@ -48,40 +51,48 @@ export default function Model() {
     });
 
     useEffect(() => {
-        const material = new THREE.ShaderMaterial({
-            ...NormalShaderMaterial,
-            side: THREE.DoubleSide
-        });
-        // const material = new THREE.MeshNormalMaterial();
-        
-        // Create a bounding box for the entire FBX model
-        const boundingBox = new THREE.Box3().setFromObject(fbx)
-        const center = boundingBox.getCenter(new THREE.Vector3())
-        
-        // Center the model by offsetting its position
-        fbx.position.x = -center.x
-        fbx.position.y = -center.y
-        fbx.position.z = -center.z
 
-        fbx.traverse((child) => {
-            if (child.isMesh) {
-                child.material = material;
-                // Ensure normals are properly calculated
-                // child.geometry.computeVertexNormals();
+        const loader = new FBXLoader()
+        loader.load('/free_head.fbx', (fbx) => {
+
+            materialRef.current = new THREE.ShaderMaterial({
+                ...NormalShaderMaterial,
+                side: THREE.DoubleSide
+            });
+
+            const geometries = []
+
+            fbx.traverse((child) => {
+                if (child.isMesh) {
+                    const cloned = child.geometry.clone()
+                    cloned.applyMatrix4(child.matrixWorld)
+                    geometries.push(cloned)
+                }
+            });
+
+            if (geometries.length > 0) {
+                const mergedGeometry = mergeGeometries(geometries, false)
+
+                mergedGeometry.computeBoundingBox()
+                const center = new THREE.Vector3()
+                mergedGeometry.boundingBox.getCenter(center)
+                mergedGeometry.translate(-center.x, -center.y, -center.z)
+
+                const merged = new THREE.Mesh(mergedGeometry, materialRef.current)
+                setMergedMesh(merged)
             }
-        });
+        })
     }, []);
+
 
     useFrame((state) => {
         if (materialRef.current) {
-            materialRef.current.uniforms.time.value = state.clock.elapsedTime;
-            materialRef.current.uniforms.intensity.value = intensity;
+            // materialRef.current.uniforms.time.value = state.clock.elapsedTime;
+            // materialRef.current.uniforms.intensity.value = intensity;
         }
     });
 
     return (
-        <group ref={groupRef} position={[0, 0, 0]}>
-            <primitive scale={0.1} object={fbx} />
-        </group>
+        mergedMesh ? <primitive object={mergedMesh} scale={0.1} /> : null
     )
 }

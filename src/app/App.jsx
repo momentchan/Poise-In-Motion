@@ -2,6 +2,7 @@ import { CameraControls } from "@react-three/drei";
 import { Canvas } from '@react-three/fiber'
 import Model from './Model'
 import PingPongEffect from "../component/PingPongEffect";
+import { Suspense } from "react";
 
 export default function App() {
     return <>
@@ -17,7 +18,9 @@ export default function App() {
         >
             <color attach="background" args={['#ffffff']} />
             <CameraControls makeDefault />
+            <Suspense fallback={null}>
             <Model />
+            </Suspense>
             <PingPongEffect />
             {/* <Utilities /> */}
         </Canvas>
