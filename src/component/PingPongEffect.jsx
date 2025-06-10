@@ -7,7 +7,7 @@ import { useControls } from 'leva'
 export default function PingPongEffect({ }) {
     // Control for blending between current and previous frames
     const { blendFactor, progress } = useControls('Ping Pong Effect', {
-        blendFactor: { value: 0.2, min: 0.01, max: 1, step: 0.01 },
+        blendFactor: { value: 0.1, min: 0.01, max: 1, step: 0.01 },
         progress: { value: 0, min: 0, max: 1, step: 0.01 }
     })
 
