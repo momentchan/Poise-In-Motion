@@ -14,10 +14,10 @@ import mathGLSL from '../r3f-gist/shader/cginc/math.glsl?raw'
 const NormalShaderMaterial = {
     uniforms: {
         time: { value: 0 },
-        intensity: { value: 1.0 },
         triScale: { value: 1.0 },
         mosaic: { value: 0 },
         progress: { value: 0 },
+        speed: { value: 0.5 },
     },
     vertexShader: /* glsl */`
         ${simplexNoiseGLSL}
@@ -30,6 +30,7 @@ const NormalShaderMaterial = {
         uniform float mosaic;
         uniform float time;
         uniform float progress;
+        uniform float speed;
         
         float PI = 3.14159265358979323846;
 
@@ -51,7 +52,7 @@ const NormalShaderMaterial = {
 
 
             // NOISE
-            float noise = simplexNoise4d(vec4(pos *0.02, time * 0.5 ));
+            float noise = simplexNoise4d(vec4(pos *0.02, time * speed ));
 
             float rotate = noise * PI * 0.1;
 
@@ -62,7 +63,6 @@ const NormalShaderMaterial = {
             float scale = 1. + noise * 0.1;
 
             pos *= scale;
-
 
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }
@@ -84,13 +84,7 @@ export default function Model() {
 
     const [mergedMesh, setMergedMesh] = useState(null)
 
-    const { intensity, triScale, mosaic, progress } = useControls('Normal Material', {
-        intensity: {
-            value: 1.0,
-            min: 0.0,
-            max: 2.0,
-            step: 0.1
-        },
+    const { triScale, mosaic, progress, speed } = useControls('Normal Material', {
         triScale: {
             value: 1.0,
             min: 0.0,
@@ -108,6 +102,12 @@ export default function Model() {
             min: 0,
             max: 1,
             step: 0.01
+        },
+        speed: {
+            value: 0.5,
+            min: 0.0,
+            max: 2.0,
+            step: 0.1
         }
     });
 
@@ -170,6 +170,7 @@ export default function Model() {
             materialRef.current.uniforms.mosaic.value = mosaic;
             materialRef.current.uniforms.time.value = state.clock.elapsedTime;
             materialRef.current.uniforms.progress.value = progress;
+            materialRef.current.uniforms.speed.value = speed;
         }
     });
 

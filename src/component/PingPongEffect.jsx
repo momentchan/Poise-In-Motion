@@ -7,7 +7,7 @@ import { useControls } from 'leva'
 export default function PingPongEffect({ }) {
     // Control for blending between current and previous frames
     const { blendFactor, progress } = useControls('Ping Pong Effect', {
-        blendFactor: { value: 0.1, min: 0.01, max: 1, step: 0.01 },
+        blendFactor: { value: 0.9, min: 0.01, max: 1, step: 0.01 },
         progress: { value: 0, min: 0, max: 1, step: 0.01 }
     })
 
@@ -72,7 +72,7 @@ export default function PingPongEffect({ }) {
 
                     vec4 curr = texture2D(current, uv);
                     vec4 last = texture2D(prev, vUv);
-                    gl_FragColor = vec4(mix(last.rgb, curr.rgb, blendFactor), 1.0);
+                    gl_FragColor = vec4(mix(curr.rgb, last.rgb, blendFactor), 1.0);
                 }
             `,
             depthTest: false,
