@@ -1,8 +1,10 @@
 import { CameraControls } from "@react-three/drei";
 import { Canvas } from '@react-three/fiber'
-import Model from './Model'
+import Head from './Head'
 import PingPongEffect from "../component/PingPongEffect";
 import { Suspense } from "react";
+import Model from "./Model";
+import { Environment } from "@react-three/drei";
 
 export default function App() {
     return <>
@@ -15,10 +17,14 @@ export default function App() {
                 position: [0, 0, 6]
             }}
         >
-            <color attach="background" args={['#ffffff']} />
+            <color attach="background" args={['#222222']} />
             <CameraControls makeDefault />
             <Suspense fallback={null}>
-            <Model />
+                {/* <ambientLight intensity={0.5} /> */}
+                <directionalLight position={[1, 1, 1]} intensity={1} />
+
+                <Environment preset="city" />
+                <Model path="Samba Dancing.fbx" />
             </Suspense>
             <PingPongEffect />
             {/* <Utilities /> */}
