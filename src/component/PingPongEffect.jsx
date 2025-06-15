@@ -1,21 +1,23 @@
 /* PingPongEffectBloom.jsx */
 import * as THREE from 'three'
 import { useThree, useFrame } from '@react-three/fiber'
-import { useFBO } from '@react-three/drei'
+import { useFBO, useTexture } from '@react-three/drei'
 import { useRef, useMemo, useEffect } from 'react'
 import { useControls } from 'leva'
+import photoshopMath from '../r3f-gist/shader/cginc/photoshopMath.glsl?raw'
 
 export default function PingPongEffect () {
   /* --- GUI ------------------------------------------------------ */
   const { blendFactor, decay, delayFrames,
-          bloomThreshold, bloomIntensity, blurStep } =
+          bloomThreshold, bloomIntensity, blurStep, finalColorOverlay } =
     useControls('Ping-pong Bloom', {
       blendFactor    : { value:0.4, min:0,   max:1,   step:0.01 },
       decay          : { value:0.9, min:0.0, max:0.995,step:0.001 },
       delayFrames    : { value:10,  min:1,   max:100, step:1 },
       bloomThreshold : { value:0.7, min:0,   max:1,   step:0.01 },
       bloomIntensity : { value:1.2, min:0,   max:3,   step:0.05 },
-      blurStep       : { value:1.0, min:0.3, max:3,   step:0.1 }
+      blurStep       : { value:1.0, min:0.3, max:3,   step:0.1 },
+      finalColorOverlay: {value: '#ffffff'}
     })
 
   /* --- R3F context --------------------------------------------- */
@@ -30,6 +32,8 @@ export default function PingPongEffect () {
 
   const useA      = useRef(true)
   const frameCnt  = useRef(0)
+
+  const paper = useTexture('/paper.png')
 
   /* --- full-screen quad stuff ---------------------------------- */
   const quadCam = useMemo(() => new THREE.OrthographicCamera(-1,1,1,-1,0,1),[])
@@ -115,20 +119,26 @@ export default function PingPongEffect () {
     uniforms:{
       base :{value:null},
       bloom:{value:null},
-      intensity:{value:bloomIntensity}
+      intensity:{value:bloomIntensity},
+      paper:{value:paper},
+      finalColorOverlay:{value:new THREE.Color(finalColorOverlay)}
     },
     vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position,1.);} `,
     fragmentShader:/* glsl */`
-      uniform sampler2D base,bloom; uniform float intensity; varying vec2 vUv;
+      ${photoshopMath}
+      uniform sampler2D base,bloom,paper; uniform float intensity; uniform vec3 finalColorOverlay; varying vec2 vUv;
       void main(){
         vec3 baseColor = texture2D(base ,vUv).rgb;
         vec3 bloomColor = texture2D(bloom,vUv).rgb*intensity;
 
-        // vec3 col = baseColor;// + bloomColor;
-        vec3 col = bloomColor;
+        vec3 col = baseColor;// + bloomColor;
+        // vec3 col = bloomColor;
         col = baseColor + bloomColor;
 
+        vec3 paperColor = texture2D(paper,vUv).rgb;
+        col = mix(col, BlendSoftLight(col, paperColor), 0.5);
 
+        col *= finalColorOverlay;
 
         gl_FragColor = vec4(clamp(col,0.,1.),1.);
       }`,
@@ -199,6 +209,8 @@ export default function PingPongEffect () {
     finalMat.uniforms.base.value      = displayRT.texture
     finalMat.uniforms.bloom.value     = blurB.texture
     finalMat.uniforms.intensity.value = bloomIntensity
+    finalMat.uniforms.paper.value     = paper
+    finalMat.uniforms.finalColorOverlay.value = new THREE.Color(finalColorOverlay)
 
     gl.setRenderTarget(null)
     gl.clear(); gl.render(finalScene,quadCam)
