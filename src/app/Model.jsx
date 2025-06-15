@@ -6,8 +6,12 @@ import { useControls } from "leva";
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
 
-export default function Model({ path, pos }) {
+export default function Model({ path, pos, scale = 1}) {
+    
     const fbx = useFBX(path)
+
+    
+
     const { ref, actions, names } = useAnimations(fbx.animations);
     const [index, setIndex] = useState(0)
     const [blendRate, setBlendRate] = useState(0)
@@ -89,11 +93,12 @@ export default function Model({ path, pos }) {
             }
         }, 10);
 
+        action.timeScale = 0.5
         action.play();
+
     }
 
     useEffect(() => {
-        // return
         const action = actions[names[index]];
         // Reset and fade in animation after an index has been changed
         applyEasedFade(action, transT, true); // Eased fade in
@@ -105,7 +110,6 @@ export default function Model({ path, pos }) {
     const material = useMemo(() => {
         let mat =  new CustomShaderMaterial({
             baseMaterial: THREE.MeshPhysicalMaterial,
-            transparent: true,
             uniforms: {
                 uBaseColor: { value: new THREE.Color(baseColor) },
                 uFresnelColor: { value: new THREE.Color(fresnelColor) },
@@ -149,8 +153,18 @@ export default function Model({ path, pos }) {
             iridescence: iridescence,
             iridescenceIOR: iridescenceIOR,
             iridescenceThicknessRange: iridescenceThicknessRange,
+            transparent: true,
+            side: THREE.FrontSide,
             // wireframe: true,
+            depthWrite: false,
         })
+
+        // mat = new THREE.MeshBasicMaterial({
+        //     color: 0x00ff00,
+        //     side: THREE.FrontSide,
+        //     transparent: true,
+        //     opacity: 0.5,
+        // })
 
         return mat;
     }, []);
@@ -159,8 +173,9 @@ export default function Model({ path, pos }) {
     const depthMat = useMemo(() => new THREE.MeshBasicMaterial({
         colorWrite:false,
         depthWrite:true,
-        depthTest :true,
-        side      :THREE.FrontSide
+        side      :THREE.FrontSide,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
       }), [])
       
       /* ───── 3. 在 FBX 載入完成後，只做一次 depthCopy ───── */
@@ -191,8 +206,8 @@ export default function Model({ path, pos }) {
       
             // ② 幾何平滑（只做一次）
             if (!child.geometry.index) {
-              child.geometry = mergeVertices(child.geometry, 1e-4)
-              child.geometry.computeVertexNormals()
+            //   child.geometry = mergeVertices(child.geometry, 1e-4)
+            //   child.geometry.computeVertexNormals()
             }
       
             copy.renderOrder   = 0
@@ -233,7 +248,7 @@ export default function Model({ path, pos }) {
 
     return (
         <group ref={ref} position={pos} onClick={() => { if (blendRate === 0 || blendRate === 1) setIndex((index + 1) % names.length) }}>
-            <primitive scale={1} object={fbx} />
+            <primitive scale={scale} object={fbx} />
         </group>
 
     )
