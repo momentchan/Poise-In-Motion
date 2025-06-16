@@ -1,26 +1,21 @@
 import { useAnimations, useFBX, useTexture } from "@react-three/drei";
 import * as THREE from 'three'
-import { useEffect, useMemo, useRef, useState } from "react";
+import { act, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useControls } from "leva";
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
 
-export default function Model({ path, pos, scale = 1}) {
-    
+export default function Model({ path, pos, scale = 1 }) {
+
     const fbx = useFBX(path)
 
-    
-
     const { ref, actions, names } = useAnimations(fbx.animations);
-    const [index, setIndex] = useState(0)
-    const [blendRate, setBlendRate] = useState(0)
+    const index = 0
 
-    const transT = 3
-
-    const { 
-        baseColor, 
-        fresnelColor, 
+    const {
+        baseColor,
+        fresnelColor,
         fresnelPower,
         // Physical Material Properties
         roughness,
@@ -43,7 +38,7 @@ export default function Model({ path, pos, scale = 1}) {
         iridescenceThicknessRange
     } = useControls('Model Shader', {
         baseColor: { value: '#ffffff', label: 'Base Color' },
-        fresnelColor: { value: '#00ffff', label: 'Fresnel Color' },
+        fresnelColor: { value: '#ffffff', label: 'Fresnel Color' },
         fresnelPower: { value: 2.0, min: 0.1, max: 5.0, step: 0.1, label: 'Fresnel Power' },
         // Physical Material Properties
         roughness: { value: 1, min: 0, max: 1, step: 0.01, label: 'Roughness' },
@@ -65,72 +60,40 @@ export default function Model({ path, pos, scale = 1}) {
         iridescenceIOR: { value: 2.3, min: 1, max: 2.33, step: 0.01, label: 'Iridescence IOR' },
         iridescenceThicknessRange: { value: [100, 400], min: 0, max: 1000, step: 1, label: 'Iridescence Thickness Range' }
     })
-
-    function easeInOutQuad(t) {
-        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-    }
-
-    function applyEasedFade(action, duration, fadeIn = true) {
-        action.setEffectiveWeight(fadeIn ? 0 : 1);
-
-        let startTime = performance.now();
-
-        const interval = setInterval(() => {
-            const elapsed = performance.now() - startTime;
-            const normalizedTime = Math.min(elapsed / (duration * 1000), 1); // Normalized time between 0 and 1
-
-            const blendRate = index === 0 ? 1 - Math.min(elapsed / (transT * 1000), 1) : Math.min(elapsed / (transT * 1000), 1);
-            setBlendRate(blendRate)
-
-            const easedTime = easeInOutQuad(normalizedTime); // Apply easing
-            const weight = fadeIn ? easedTime : 1 - easedTime;
-
-            action.setEffectiveWeight(weight);
-
-            if (normalizedTime === 1) {
-                if (!fadeIn) action.stop(); // Stop the action if it's fading out
-                clearInterval(interval);
-            }
-        }, 10);
-
-        action.timeScale = 0.5
-        action.play();
-
-    }
-
+    
+    const currentAction = useRef(null)
     useEffect(() => {
         const action = actions[names[index]];
-        // Reset and fade in animation after an index has been changed
-        applyEasedFade(action, transT, true); // Eased fade in
-
-        // In the clean-up phase, fade it out
-        return () => applyEasedFade(action, transT, false); // Eased fade out
-    }, [index, actions, names])
+        action.play()
+        currentAction.current = action
+    }, [ actions, names])
 
     const material = useMemo(() => {
-        let mat =  new CustomShaderMaterial({
+        let mat = new CustomShaderMaterial({
             baseMaterial: THREE.MeshPhysicalMaterial,
             uniforms: {
                 uBaseColor: { value: new THREE.Color(baseColor) },
                 uFresnelColor: { value: new THREE.Color(fresnelColor) },
-                uFresnelPow: { value: fresnelPower }
+                uFresnelPow: { value: fresnelPower },
+                uRatio: { value: 0 }
             },
             fragmentShader: /* glsl */`
             uniform vec3  uBaseColor;
             uniform vec3  uFresnelColor;
             uniform float uFresnelPow;
+            uniform float uRatio;
       
             void main() {
                 vec3 N = normalize( vNormal );
                 vec3 V = normalize( vViewPosition );   
       
-              float fresnel = pow(1.0 - max(dot(N, V), 0.0), uFresnelPow);
-              vec3  color   = mix(uBaseColor, uFresnelColor, fresnel);
+                float fresnel = pow(1.0 - max(dot(N, V), 0.0), uFresnelPow);
+                vec3  color   = mix(uBaseColor, uFresnelColor, fresnel);
 
-      
-            //   color = V;
-            //   csm_DiffuseColor = vec4(color, 0.2);
-            csm_DiffuseColor.a *= fresnel;
+                float ratio = smoothstep(0.0, 0.02, uRatio) * smoothstep(1.0, 0.98, uRatio); 
+                //   color = V;
+                  csm_DiffuseColor = vec4(color, fresnel * ratio);
+                // csm_DiffuseColor.a *= fresnel * ratio;
 
             }
           `, silent: true,
@@ -168,62 +131,80 @@ export default function Model({ path, pos, scale = 1}) {
 
         return mat;
     }, []);
-    
+
 
     const depthMat = useMemo(() => new THREE.MeshBasicMaterial({
-        colorWrite:false,
-        depthWrite:true,
-        side      :THREE.FrontSide,
+        colorWrite: false,
+        depthWrite: true,
+        side: THREE.FrontSide,
         polygonOffset: true,
         polygonOffsetFactor: 1,
-      }), [])
-      
-      /* ───── 3. 在 FBX 載入完成後，只做一次 depthCopy ───── */
-      useEffect(() => {
+    }), [])
+
+    /* ───── 3. 在 FBX 載入完成後，只做一次 depthCopy ───── */
+    useEffect(() => {
         if (!fbx) return                 // 模型尚未載入
-      
+
         const DEPTH_TAG = Symbol('depthCopy')
-      
+
         fbx.traverse(child => {
-          if (!child.isMesh) return
-      
-          /* 主透明材質：每次進 effect 都可更新 */
-          child.material       = material
-          child.renderOrder    = 1
-          child.frustumCulled  = false
-      
-          /* 若還沒有 depthCopy → 建立一次並標記 */
-          if (!child.userData[DEPTH_TAG]) {
-      
-            // ① 建立適當的 depthCopy（含骨架綁定）
-            const copy = child.isSkinnedMesh
-              ? (() => {
-                  const sk = new THREE.SkinnedMesh(child.geometry, depthMat)
-                  sk.bind(child.skeleton, child.bindMatrix)
-                  return sk
-                })()
-              : new THREE.Mesh(child.geometry, depthMat)
-      
-            // ② 幾何平滑（只做一次）
-            if (!child.geometry.index) {
-            //   child.geometry = mergeVertices(child.geometry, 1e-4)
-            //   child.geometry.computeVertexNormals()
+            if (!child.isMesh) return
+
+            /* 主透明材質：每次進 effect 都可更新 */
+            child.material = material
+            child.renderOrder = 1
+            child.frustumCulled = false
+
+            /* 若還沒有 depthCopy → 建立一次並標記 */
+            if (!child.userData[DEPTH_TAG]) {
+
+                // ① 建立適當的 depthCopy（含骨架綁定）
+                const copy = child.isSkinnedMesh
+                    ? (() => {
+                        const sk = new THREE.SkinnedMesh(child.geometry, depthMat)
+                        sk.bind(child.skeleton, child.bindMatrix)
+                        return sk
+                    })()
+                    : new THREE.Mesh(child.geometry, depthMat)
+
+                // ② 幾何平滑（只做一次）
+                if (!child.geometry.index) {
+                    //   child.geometry = mergeVertices(child.geometry, 1e-4)
+                    //   child.geometry.computeVertexNormals()
+                }
+
+                copy.renderOrder = 0
+                copy.frustumCulled = false
+                child.parent.add(copy)
+                child.userData[DEPTH_TAG] = copy        // 標籤，避免重複
             }
-      
-            copy.renderOrder   = 0
-            copy.frustumCulled = false
-            child.parent.add(copy)
-            child.userData[DEPTH_TAG] = copy        // 標籤，避免重複
-          }
         })
-      }, [fbx, depthMat])
+    }, [fbx, depthMat])
+
+    function findBone(root, regex) {
+        let found = null;
+        root.traverse(o => {
+            if (o.isBone && regex.test(o.name)) found = o;
+        });
+        return found;
+    }
+    
 
     useFrame((state, delta) => {
+
+        if (!currentAction.current) return;
+
+        // three r148+ 有 getClip()；舊版可用 _clip
+        const clip = currentAction.current.getClip ? currentAction.current.getClip() : currentAction.current._clip;
+        const dur = clip.duration;              // 秒
+        const norm = (currentAction.current.time % dur) / dur;  // 0–1
+
+
         if (material) {
             material.uniforms.uBaseColor.value.set(baseColor)
             material.uniforms.uFresnelColor.value.set(fresnelColor)
             material.uniforms.uFresnelPow.value = fresnelPower
-            
+            material.uniforms.uRatio.value = norm
             // Update physical material properties
             material.roughness = roughness
             material.metalness = metalness

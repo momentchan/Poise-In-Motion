@@ -20,12 +20,12 @@ export default function App() {
             <color attach="background" args={['#222222']} />
             <CameraControls makeDefault />
             {/* <ambientLight intensity={0.5} /> */}
-            <directionalLight position={[1, 1, 1]} intensity={1} />
+            <directionalLight position={[1, 1, 1]} intensity={10} />
 
             <Environment preset="city" />
-            {/* <Model path="Samba Dancing.fbx" scale={1} /> */}
             <Suspense fallback={null}>  
-                <Model path="Beta Ballet2.fbx" scale={0.01} />
+            {/* <Model path="Samba Dancing.fbx" scale={1} /> */}
+                <Model path="Beta Ballet2_Smooth.fbx" scale={0.01} />
             </Suspense>
                 <PingPongEffect />
             {/* <Utilities /> */}

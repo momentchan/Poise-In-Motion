@@ -9,26 +9,37 @@ import photoshopMath from '../r3f-gist/shader/cginc/photoshopMath.glsl?raw'
 export default function PingPongEffect () {
   /* --- GUI ------------------------------------------------------ */
   const { blendFactor, decay, delayFrames,
-          bloomThreshold, bloomIntensity, blurStep, finalColorOverlay } =
+          bloomThreshold, bloomIntensity, blurStep, finalColorOverlay, paperBlend, bloomBlend } =
     useControls('Ping-pong Bloom', {
       blendFactor    : { value:0.4, min:0,   max:1,   step:0.01 },
       decay          : { value:0.9, min:0.0, max:0.995,step:0.001 },
       delayFrames    : { value:10,  min:1,   max:100, step:1 },
       bloomThreshold : { value:0.7, min:0,   max:1,   step:0.01 },
       bloomIntensity : { value:1.2, min:0,   max:3,   step:0.05 },
-      blurStep       : { value:1.0, min:0.3, max:3,   step:0.1 },
-      finalColorOverlay: {value: '#ffffff'}
+      blurStep       : { value:1.0, min:0.3, max:30,   step:0.1 },
+      bloomBlend     : { value:0.5, min:0,   max:1,   step:0.01 },
+      finalColorOverlay: {value: '#ffffff'},
+      paperBlend: {value: 0.2, min:0, max:1, step:0.01}
     })
 
   /* --- R3F context --------------------------------------------- */
   const { gl, scene, camera, size } = useThree()
-  const fboSource = useFBO(size.width, size.height)   // live scene
-  const trailA    = useFBO(size.width, size.height)
-  const trailB    = useFBO(size.width, size.height)
-  const displayRT = useFBO(size.width, size.height)   // mix result
-  const brightRT  = useFBO(size.width, size.height)
-  const blurA     = useFBO(size.width, size.height)
-  const blurB     = useFBO(size.width, size.height)
+
+  const fboParams = {
+    type: THREE.HalfFloatType,       // ✅ 高精度 HDR 色彩
+    format: THREE.RGBAFormat,        // ✅ 保留透明度
+    minFilter: THREE.LinearFilter,   // ✅ 避免像素鋸齒
+    magFilter: THREE.LinearFilter,
+    stencilBuffer: false             // ✅ 通常也不需要 stencil
+  }
+
+  const fboSource = useFBO(size.width, size.height, fboParams)  // live scene
+const trailA    = useFBO(size.width, size.height, fboParams)
+const trailB    = useFBO(size.width, size.height, fboParams)
+const displayRT = useFBO(size.width, size.height, fboParams)  // mix result
+const brightRT  = useFBO(size.width, size.height, fboParams)
+const blurA     = useFBO(size.width, size.height, fboParams)
+const blurB     = useFBO(size.width, size.height, fboParams)
 
   const useA      = useRef(true)
   const frameCnt  = useRef(0)
@@ -121,22 +132,25 @@ export default function PingPongEffect () {
       bloom:{value:null},
       intensity:{value:bloomIntensity},
       paper:{value:paper},
-      finalColorOverlay:{value:new THREE.Color(finalColorOverlay)}
+      finalColorOverlay:{value:new THREE.Color(finalColorOverlay)},
+      paperBlend:{value:paperBlend},
+      bloomBlend:{value:bloomBlend}
     },
     vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position,1.);} `,
     fragmentShader:/* glsl */`
       ${photoshopMath}
-      uniform sampler2D base,bloom,paper; uniform float intensity; uniform vec3 finalColorOverlay; varying vec2 vUv;
+      uniform sampler2D base,bloom,paper; uniform float intensity; uniform vec3 finalColorOverlay; uniform float paperBlend; uniform float bloomBlend; varying vec2 vUv;
       void main(){
         vec3 baseColor = texture2D(base ,vUv).rgb;
         vec3 bloomColor = texture2D(bloom,vUv).rgb*intensity;
 
         vec3 col = baseColor;// + bloomColor;
+        // col = baseColor + bloomColor;
         // vec3 col = bloomColor;
-        col = baseColor + bloomColor;
+        col = mix(baseColor + bloomColor, bloomColor, bloomBlend);
 
         vec3 paperColor = texture2D(paper,vUv).rgb;
-        col = mix(col, BlendSoftLight(col, paperColor), 0.5);
+        col = mix(col, BlendSoftLight(col, paperColor), paperBlend);
 
         col *= finalColorOverlay;
 
@@ -211,6 +225,8 @@ export default function PingPongEffect () {
     finalMat.uniforms.intensity.value = bloomIntensity
     finalMat.uniforms.paper.value     = paper
     finalMat.uniforms.finalColorOverlay.value = new THREE.Color(finalColorOverlay)
+    finalMat.uniforms.paperBlend.value = paperBlend
+    finalMat.uniforms.bloomBlend.value = bloomBlend
 
     gl.setRenderTarget(null)
     gl.clear(); gl.render(finalScene,quadCam)
