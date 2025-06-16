@@ -1,7 +1,7 @@
 import { CameraControls } from "@react-three/drei";
 import { Canvas } from '@react-three/fiber'
 import Head from './Head'
-import PingPongEffect from "../component/PingPongEffect";
+import AccumulatedBloomTrailEffect from "../component/AccumulatedBloomTrailEffect";
 import { Suspense } from "react";
 import Model from "./Model";
 import { Environment } from "@react-three/drei";
@@ -23,11 +23,11 @@ export default function App() {
             <directionalLight position={[1, 1, 1]} intensity={10} />
 
             <Environment preset="city" />
-            <Suspense fallback={null}>  
-            {/* <Model path="Samba Dancing.fbx" scale={1} /> */}
+            <Suspense fallback={null}>
+                {/* <Model path="Samba Dancing.fbx" scale={1} /> */}
                 <Model path="Beta Ballet2_Smooth.fbx" scale={0.01} />
             </Suspense>
-                <PingPongEffect />
+            <AccumulatedBloomTrailEffect />
             {/* <Utilities /> */}
         </Canvas>
     </>
