@@ -14,25 +14,10 @@ function createCustomMaterial(params) {
         fresnelPower,
         roughness,
         metalness,
-        clearcoat,
-        clearcoatRoughness,
-        transmission,
-        thickness,
-        attenuationDistance,
-        attenuationColor,
-        ior,
-        reflectivity,
-        sheen,
-        sheenRoughness,
-        sheenColor,
-        specularIntensity,
-        specularColor,
-        iridescence,
-        iridescenceIOR,
-        iridescenceThicknessRange,
+        wireframe,
     } = params;
     return new CustomShaderMaterial({
-        baseMaterial: THREE.MeshPhysicalMaterial,
+        baseMaterial: THREE.MeshStandardMaterial,
         uniforms: {
             uBaseColor: { value: new THREE.Color(baseColor) },
             uFresnelColor: { value: new THREE.Color(fresnelColor) },
@@ -56,25 +41,10 @@ function createCustomMaterial(params) {
         silent: true,
         roughness,
         metalness,
-        clearcoat,
-        clearcoatRoughness,
-        transmission,
-        thickness,
-        attenuationDistance,
-        attenuationColor: new THREE.Color(attenuationColor),
-        ior,
-        reflectivity,
-        sheen,
-        sheenRoughness,
-        sheenColor: new THREE.Color(sheenColor),
-        specularIntensity,
-        specularColor: new THREE.Color(specularColor),
-        iridescence,
-        iridescenceIOR,
-        iridescenceThicknessRange,
-        transparent: true,
+        wireframe,
         side: THREE.FrontSide,
         depthWrite: false,
+        transparent: true,
     });
 }
 
@@ -125,22 +95,7 @@ export default function Model({ path, pos, scale = 1 }) {
         fresnelPower: { value: 2.0, min: 0.1, max: 5.0, step: 0.1, label: "Fresnel Power" },
         roughness: { value: 1, min: 0, max: 1, step: 0.01, label: "Roughness" },
         metalness: { value: 1, min: 0, max: 1, step: 0.01, label: "Metalness" },
-        clearcoat: { value: 0.83, min: 0, max: 1, step: 0.01, label: "Clearcoat" },
-        clearcoatRoughness: { value: 1, min: 0, max: 1, step: 0.01, label: "Clearcoat Roughness" },
-        transmission: { value: 1, min: 0, max: 1, step: 0.01, label: "Transmission" },
-        thickness: { value: 0.5, min: 0, max: 1, step: 0.01, label: "Thickness" },
-        attenuationDistance: { value: 0.9, min: 0, max: 1, step: 0.01, label: "Attenuation Distance" },
-        attenuationColor: { value: "#ffffff", label: "Attenuation Color" },
-        ior: { value: 1.5, min: 1, max: 2.33, step: 0.01, label: "IOR" },
-        reflectivity: { value: 0.5, min: 0, max: 1, step: 0.01, label: "Reflectivity" },
-        sheen: { value: 1.0, min: 0, max: 1, step: 0.01, label: "Sheen" },
-        sheenRoughness: { value: 1.0, min: 0, max: 1, step: 0.01, label: "Sheen Roughness" },
-        sheenColor: { value: "#ffffff", label: "Sheen Color" },
-        specularIntensity: { value: 1, min: 0, max: 1, step: 0.01, label: "Specular Intensity" },
-        specularColor: { value: "#ffffff", label: "Specular Color" },
-        iridescence: { value: 1, min: 0, max: 1, step: 0.01, label: "Iridescence" },
-        iridescenceIOR: { value: 2.3, min: 1, max: 2.33, step: 0.01, label: "Iridescence IOR" },
-        iridescenceThicknessRange: { value: [100, 400], min: 0, max: 1000, step: 1, label: "Iridescence Thickness Range" },
+        wireframe: { value: false, label: "Wireframe" },
     };
     const controls = useControls("Model Shader", control);
 
@@ -173,28 +128,15 @@ export default function Model({ path, pos, scale = 1 }) {
             if (material.uniforms.uFresnelColor) material.uniforms.uFresnelColor.value.set(controls.fresnelColor);
             if (material.uniforms.uFresnelPow) material.uniforms.uFresnelPow.value = controls.fresnelPower;
             if (material.uniforms.uRatio) material.uniforms.uRatio.value = norm;
-            // Material properties (loop for color types)
-            const colorProps = [
-                ["attenuationColor", controls.attenuationColor],
-                ["sheenColor", controls.sheenColor],
-                ["specularColor", controls.specularColor],
-            ];
-            colorProps.forEach(([key, val]) => {
-                if (material[key] && material[key].set) material[key].set(val);
-            });
-            // Scalar properties
-            const scalarProps = [
-                "roughness","metalness","clearcoat","clearcoatRoughness","transmission","thickness","attenuationDistance","ior","reflectivity","sheen","sheenRoughness","specularIntensity","iridescence","iridescenceIOR","iridescenceThicknessRange"
-            ];
-            scalarProps.forEach((key) => {
-                if (material[key] !== undefined && controls[key] !== undefined) material[key] = controls[key];
-            });
+            // Material properties
+            material.roughness = controls.roughness;
+            material.metalness = controls.metalness;
         }
     });
 
     // === 7. Render Model ===
     return (
-        <group ref={ref} position={pos} onClick={() => { if (blendRate === 0 || blendRate === 1) setIndex((index + 1) % names.length) }}>
+        <group ref={ref} position={pos}>
             <primitive scale={scale} object={fbx} />
         </group>
     )
