@@ -35,6 +35,7 @@ function createCustomMaterial(params) {
                 float fresnel = pow(1.0 - max(dot(N, V), 0.0), uFresnelPow);
                 vec3 color = mix(uBaseColor, uFresnelColor, fresnel);
                 float ratio = smoothstep(0.0, 0.02, uRatio) * smoothstep(1.0, 0.98, uRatio);
+                color += ambientLightColor;
                 csm_DiffuseColor = vec4(color, fresnel * ratio);
             }
         `,
@@ -42,9 +43,9 @@ function createCustomMaterial(params) {
         roughness,
         metalness,
         wireframe,
+        transparent: true,
         side: THREE.FrontSide,
         depthWrite: false,
-        transparent: true,
     });
 }
 
@@ -87,6 +88,8 @@ export default function Model({ path, pos, scale = 1 }) {
     const index = 0
 
     const currentAction = useRef(null)
+    const randomRotation = useRef(Math.random() * Math.PI * 2) // Random angle between 0 and 2π
+    const randomOffset = useRef({ x: 0, z: 0 }) // Random position offset on XZ plane
 
     // === 2. Gather all Leva controls in a single object ===
     const control = {
@@ -96,6 +99,7 @@ export default function Model({ path, pos, scale = 1 }) {
         roughness: { value: 1, min: 0, max: 1, step: 0.01, label: "Roughness" },
         metalness: { value: 1, min: 0, max: 1, step: 0.01, label: "Metalness" },
         wireframe: { value: false, label: "Wireframe" },
+        offsetRange: { value: 2, min: 0, max: 5, step: 0.1, label: "Position Offset Range" },
     };
     const controls = useControls("Model Shader", control);
 
@@ -116,11 +120,26 @@ export default function Model({ path, pos, scale = 1 }) {
     }, [fbx, material]);
 
     // === 6. Animation Frame Updates ===
+    const lastNorm = useRef(0);
     useFrame(() => {
         if (!currentAction.current) return;
         const clip = currentAction.current.getClip ? currentAction.current.getClip() : currentAction.current._clip;
         const dur = clip.duration;
         const norm = (currentAction.current.time % dur) / dur;
+        
+        // Apply random rotation and position when animation finishes
+        if (lastNorm.current > 0.95 && norm < 0.05 && ref.current) {
+            randomRotation.current = Math.random() * Math.PI * 2;
+            // Generate random offsets within the specified range
+            randomOffset.current = {
+                x: (Math.random() - 0.5) * controls.offsetRange * 2,
+                z: (Math.random() - 0.5) * controls.offsetRange * 2
+            };
+            ref.current.rotation.y = randomRotation.current;
+            ref.current.position.x = randomOffset.current.x;
+            ref.current.position.z = randomOffset.current.z;
+        }
+        lastNorm.current = norm;
         // Update shader uniforms and material properties
         if (material) {
             // Uniforms
@@ -131,6 +150,7 @@ export default function Model({ path, pos, scale = 1 }) {
             // Material properties
             material.roughness = controls.roughness;
             material.metalness = controls.metalness;
+            material.wireframe = controls.wireframe;
         }
     });
 
