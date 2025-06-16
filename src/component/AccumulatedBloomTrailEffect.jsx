@@ -17,7 +17,7 @@ export default function AccumulatedBloomTrailEffect() {
     Bloom: folder({
       bloomThreshold: { value: 0.1, min: 0, max: 1, step: 0.01 },
       bloomIntensity: { value: 0.6, min: 0, max: 3, step: 0.05 },
-      blurStep: { value: 1.0, min: 0.3, max: 30, step: 0.1 },
+      bloomScatter: { value: 1.0, min: 0.3, max: 30, step: 0.1 },
       iterations: { value: 14, min: 1, max: 20, step: 1 },
       bloomScale: { value: 4, min: 1, max: 8, step: 1 },
       bloomBlend: { value: 0, min: 0, max: 1, step: 0.01 },
@@ -229,7 +229,7 @@ function runKawaseBlur(gl, brightRT, blurA, blurB, blurMat, blurScene, low, cont
   let ping = blurA, pong = blurB
   for (let i = 0; i < controls.iterations; i++) {
     const horiz = (i & 1) === 0
-    const off = horiz ? controls.blurStep / low.current.w : controls.blurStep / low.current.h
+    const off = horiz ? controls.bloomScatter / low.current.w : controls.bloomScatter / low.current.h
     blurMat.uniforms.src.value = (i === 0 ? brightRT.texture : ping.texture)
     blurMat.uniforms.offset.value.set(horiz ? off : 0.0, horiz ? 0.0 : off)
     gl.setRenderTarget(pong)

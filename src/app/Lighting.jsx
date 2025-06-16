@@ -1,0 +1,79 @@
+import React, { useRef, useEffect } from 'react'
+import { useThree } from '@react-three/fiber'
+import * as THREE from 'three'
+
+export default function Lighting({ helper = false }) {
+  const keyLightRef = useRef()
+  const fillLightRef = useRef()
+  const backLightRef = useRef()
+  const { scene } = useThree()
+
+  useEffect(() => {
+    const helpers = []
+    if (helper) {
+      if (keyLightRef.current) {
+        const h = new THREE.DirectionalLightHelper(keyLightRef.current, 1, 'red')
+        scene.add(h)
+        helpers.push(h)
+      }
+      if (fillLightRef.current) {
+        const h = new THREE.DirectionalLightHelper(fillLightRef.current, 1, 'blue')
+        scene.add(h)
+        helpers.push(h)
+      }
+      if (backLightRef.current) {
+        const h = new THREE.DirectionalLightHelper(backLightRef.current, 1, 'green')
+        scene.add(h)
+        helpers.push(h)
+      }
+    }
+    return () => {
+      helpers.forEach(h => {
+        scene.remove(h)
+        h.dispose && h.dispose()
+      })
+    }
+  }, [helper, scene])
+
+  return (
+    <>
+      {/* === Key Light ===
+          Main directional light from the front-side/top-right.
+          Provides main lighting and casts shadows.
+      */}
+      <directionalLight
+        ref={keyLightRef}
+        position={[5, 10, 5]}
+        intensity={2.0}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+      />
+
+      {/* === Fill Light ===
+          Soft light to reduce harsh shadows.
+          Positioned on the opposite side of the key light.
+      */}
+      <directionalLight
+        ref={fillLightRef}
+        position={[-3, 5, 2]}
+        intensity={0.5}
+      />
+
+      {/* === Back Light (Rim Light) ===
+          Positioned behind and above the object.
+          Creates edge highlights and adds depth.
+      */}
+      <directionalLight
+        ref={backLightRef}
+        position={[-5, 10, -5]}
+        intensity={1.0}
+      />
+
+      {/* === Ambient Light ===
+          Uniform ambient light for subtle base illumination.
+      */}
+      <ambientLight intensity={0.2} />
+    </>
+  )
+}

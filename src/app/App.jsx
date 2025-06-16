@@ -5,9 +5,14 @@ import AccumulatedBloomTrailEffect from "../component/AccumulatedBloomTrailEffec
 import { Suspense } from "react";
 import Model from "./Model";
 import { Environment } from "@react-three/drei";
+import { Leva } from 'leva';
+import { customTheme } from "../r3f-gist/theme/levaTheme.js";
+import Lighting from "./Lighting.jsx";
 
 export default function App() {
     return <>
+        <Leva theme={customTheme} />
+
         <Canvas
             shadows
             camera={{
@@ -19,12 +24,10 @@ export default function App() {
         >
             <color attach="background" args={['#222222']} />
             <CameraControls makeDefault />
-            {/* <ambientLight intensity={0.5} /> */}
-            <directionalLight position={[1, 1, 1]} intensity={10} />
+            <Lighting helper={false} />
 
-            <Environment preset="city" />
+
             <Suspense fallback={null}>
-                {/* <Model path="Samba Dancing.fbx" scale={1} /> */}
                 <Model path="Beta Ballet2_Smooth.fbx" scale={0.01} />
             </Suspense>
             <AccumulatedBloomTrailEffect />
