@@ -26,7 +26,6 @@ export default function App() {
             <CameraControls makeDefault />
             <Lighting helper={false} />
 
-
             <Suspense fallback={null}>
                 <Model path="Beta Ballet2_Smooth.fbx" scale={0.01} />
             </Suspense>

@@ -5,6 +5,7 @@ import { useFBO, useTexture } from '@react-three/drei'
 import { useRef, useMemo, useEffect } from 'react'
 import { folder, useControls } from 'leva'
 import photoshopMath from '../r3f-gist/shader/cginc/photoshopMath.glsl?raw'
+import { createSMAAMaterial } from '../r3f-gist/effect/SMAAEffect'
 
 export default function AccumulatedBloomTrailEffect() {
   /* ==== UI sliders =========================================== */
@@ -24,7 +25,12 @@ export default function AccumulatedBloomTrailEffect() {
     }),
     Final: folder({
       finalColorOverlay: { value: '#ffffff' },
-      paperBlend: { value: 0.5, min: 0, max: 1, step: 0.01 }
+      paperBlend: { value: 0.3, min: 0, max: 1, step: 0.01 }
+    }),
+    smaa: folder({
+      smaaEnabled: { value: true},
+      debug: { value: false },
+      edgeThreshold: { value: 0.1, min: 0.01, max: 0.5, step: 0.01},
     })
   })
 
@@ -43,6 +49,7 @@ export default function AccumulatedBloomTrailEffect() {
   const trailA = useFBO(size.width, size.height, fboParams)
   const trailB = useFBO(size.width, size.height, fboParams)
   const displayRT = useFBO(size.width, size.height, fboParams)
+  const compositeRT = useFBO(size.width, size.height, fboParams)
 
   /* low-res bloom FBOs (created once, resized on window resize) */
   const low = useRef({ w: 1, h: 1 })
@@ -86,6 +93,26 @@ export default function AccumulatedBloomTrailEffect() {
   const finalMat = useMemo(() => createFinalMaterial(controls, paper), [controls, paper])
   const finalScene = useMemo(() => new THREE.Scene().add(new THREE.Mesh(quadGeo, finalMat)), [quadGeo, finalMat])
 
+  
+
+  // Add SMAA render target
+  const smaaRT = useMemo(() => {
+    const rt = new THREE.WebGLRenderTarget(size.width, size.height, {
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+    })
+    rt.texture.name = "SMAA"
+    return rt
+  }, [size])
+
+
+  // Create SMAA material
+  const smaaMat = useMemo(() => createSMAAMaterial(size, false, 0.1), [size])
+
+  const smaaScene = useMemo(() => new THREE.Scene().add(new THREE.Mesh(quadGeo, smaaMat)), [quadGeo, smaaMat])
+
   /* ==== frame loop ============================================ */
   useFrame(() => {
     renderMainScene(gl, scene, camera, fboSource)
@@ -94,7 +121,22 @@ export default function AccumulatedBloomTrailEffect() {
     mixCurrentAndTrail(gl, fboSource, trailTex, mixMat, displayRT, mixScene, quadCam)
     runBrightPass(gl, displayRT, brightMat, brightScene, brightRT, quadCam)
     const bloomTex = runKawaseBlur(gl, brightRT, blurA, blurB, blurMat, blurScene, low, controls, quadCam)
-    compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, finalScene, quadCam, controls)
+    
+    // First do the bloom composite
+    compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, compositeRT, finalScene, quadCam, controls)
+    
+    // Then apply SMAA as final step
+    if (controls.smaaEnabled) {  
+      smaaMat.uniforms.tDiffuse.value = compositeRT.texture
+      smaaMat.uniforms.debugMode.value = controls.debug
+      smaaMat.uniforms.edgeThreshold.value = controls.edgeThreshold 
+      smaaMat.uniforms.resolution.value.set(size.width, size.height)
+      gl.setRenderTarget(null) // Render to screen
+      gl.render(smaaScene, quadCam)
+    }else{
+      gl.setRenderTarget(null) // Render to screen
+      gl.render(finalScene, quadCam)
+    }
   }, 1)
 
   return null
@@ -240,7 +282,7 @@ function runKawaseBlur(gl, brightRT, blurA, blurB, blurMat, blurScene, low, cont
   return ping.texture
 }
 
-function compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, finalScene, quadCam, controls) {
+function compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, compositeRT, finalScene, quadCam, controls) {
   finalMat.uniforms.base.value = displayRT.texture
   finalMat.uniforms.bloom.value = bloomTex
   finalMat.uniforms.intensity.value = controls.bloomIntensity
@@ -248,7 +290,7 @@ function compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, finalScene,
   finalMat.uniforms.finalColorOverlay.value.set(controls.finalColorOverlay)
   finalMat.uniforms.paperBlend.value = controls.paperBlend
   finalMat.uniforms.bloomBlend.value = controls.bloomBlend
-  gl.setRenderTarget(null)
+  gl.setRenderTarget(compositeRT)
   gl.clear()
   gl.render(finalScene, quadCam)
 }

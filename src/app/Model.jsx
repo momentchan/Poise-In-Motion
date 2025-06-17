@@ -90,6 +90,7 @@ export default function Model({ path, pos, scale = 1 }) {
     const currentAction = useRef(null)
     const randomRotation = useRef(Math.random() * Math.PI * 2) // Random angle between 0 and 2π
     const randomOffset = useRef({ x: 0, z: 0 }) // Random position offset on XZ plane
+    const isPaused = useRef(false)
 
     // === 2. Gather all Leva controls in a single object ===
     const control = {
@@ -111,6 +112,23 @@ export default function Model({ path, pos, scale = 1 }) {
         const action = actions[names[index]];
         action.play();
         currentAction.current = action;
+
+        // Add space key event listener
+        const handleKeyPress = (event) => {
+            if (event.code === 'Space') {
+                isPaused.current = !isPaused.current;
+                if (isPaused.current) {
+                    currentAction.current.paused = true;
+                } else {
+                    currentAction.current.paused = false;
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => {
+            window.removeEventListener('keydown', handleKeyPress);
+        };
     }, [actions, names, index]);
 
     // === 5. Add Depth Copy to FBX Meshes ===
