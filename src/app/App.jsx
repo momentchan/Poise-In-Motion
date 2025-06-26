@@ -27,7 +27,7 @@ export default function App() {
             <Lighting helper={false} />
 
             <Suspense fallback={null}>
-                <Model path="Beta Ballet2_Smooth.fbx" scale={0.01} />
+                <Model path="ballerina_dance.fbx" scale={0.01} />
             </Suspense>
             <AccumulatedBloomTrailEffect />
             {/* <Utilities /> */}

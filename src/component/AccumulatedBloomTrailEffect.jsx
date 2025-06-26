@@ -23,15 +23,15 @@ export default function AccumulatedBloomTrailEffect() {
       bloomScale: { value: 4, min: 1, max: 8, step: 1 },
       bloomBlend: { value: 0, min: 0, max: 1, step: 0.01 },
     }),
+    SMAA: folder({
+      smaaEnabled: { value: true},
+      debug: { value: false },
+      edgeThreshold: { value: 0.1, min: 0.01, max: 0.5, step: 0.01},
+    }),
     Final: folder({
       finalColorOverlay: { value: '#ffffff' },
       paperBlend: { value: 0.3, min: 0, max: 1, step: 0.01 }
     }),
-    smaa: folder({
-      smaaEnabled: { value: true},
-      debug: { value: false },
-      edgeThreshold: { value: 0.1, min: 0.01, max: 0.5, step: 0.01},
-    })
   })
 
   /* ==== helpers ============================================== */

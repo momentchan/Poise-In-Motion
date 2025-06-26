@@ -10,7 +10,8 @@ export default function Lighting({ helper = false }) {
   const { scene } = useThree()
 
   // Leva controls for all light intensities
-  const { keyLightIntensity, fillLightIntensity, backLightIntensity, ambientLightIntensity } = useControls('Lighting', {
+  const { enabled, keyLightIntensity, fillLightIntensity, backLightIntensity, ambientLightIntensity } = useControls('Lighting', {
+    enabled: { value: true, label: 'Enable Lighting' },
     keyLightIntensity: { value: 2.0, min: 0, max: 10, step: 0.01, label: 'Key Light Intensity' },
     fillLightIntensity: { value: 0.5, min: 0, max: 10, step: 0.01, label: 'Fill Light Intensity' },
     backLightIntensity: { value: 1.0, min: 0, max: 10, step: 0.01, label: 'Back Light Intensity' },
@@ -44,6 +45,12 @@ export default function Lighting({ helper = false }) {
     }
   }, [helper, scene])
 
+  // Calculate actual intensities based on enabled state
+  const actualKeyIntensity = enabled ? keyLightIntensity : 0
+  const actualFillIntensity = enabled ? fillLightIntensity : 0
+  const actualBackIntensity = enabled ? backLightIntensity : 0
+  const actualAmbientIntensity = enabled ? ambientLightIntensity : 0
+
   return (
     <>
       {/* === Key Light ===
@@ -53,7 +60,7 @@ export default function Lighting({ helper = false }) {
       <directionalLight
         ref={keyLightRef}
         position={[5, 10, 5]}
-        intensity={keyLightIntensity}
+        intensity={actualKeyIntensity}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
@@ -66,7 +73,7 @@ export default function Lighting({ helper = false }) {
       <directionalLight
         ref={fillLightRef}
         position={[-3, 5, 2]}
-        intensity={fillLightIntensity}
+        intensity={actualFillIntensity}
       />
 
       {/* === Back Light (Rim Light) ===
@@ -76,13 +83,13 @@ export default function Lighting({ helper = false }) {
       <directionalLight
         ref={backLightRef}
         position={[-5, 10, -5]}
-        intensity={backLightIntensity}
+        intensity={actualBackIntensity}
       />
 
       {/* === Ambient Light ===
           Uniform ambient light for subtle base illumination.
       */}
-      <ambientLight intensity={ambientLightIntensity} />
+      <ambientLight intensity={actualAmbientIntensity} />
     </>
   )
 }
