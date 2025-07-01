@@ -44,7 +44,7 @@ function createCustomMaterial(params) {
         metalness,
         wireframe,
         transparent: true,
-        side: THREE.FrontSide,
+        side: THREE.DoubleSide,
         depthWrite: false,
     });
 }

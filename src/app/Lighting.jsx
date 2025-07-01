@@ -7,14 +7,16 @@ export default function Lighting({ helper = false }) {
   const keyLightRef = useRef()
   const fillLightRef = useRef()
   const backLightRef = useRef()
+  const upLightRef = useRef()
   const { scene } = useThree()
 
   // Leva controls for all light intensities
-  const { enabled, keyLightIntensity, fillLightIntensity, backLightIntensity, ambientLightIntensity } = useControls('Lighting', {
+  const { enabled, keyLightIntensity, fillLightIntensity, backLightIntensity, ambientLightIntensity, upLightIntensity } = useControls('Lighting', {
     enabled: { value: true, label: 'Enable Lighting' },
-    keyLightIntensity: { value: 2.0, min: 0, max: 10, step: 0.01, label: 'Key Light Intensity' },
+    keyLightIntensity: { value: 0.8, min: 0, max: 10, step: 0.01, label: 'Key Light Intensity' },
     fillLightIntensity: { value: 0.5, min: 0, max: 10, step: 0.01, label: 'Fill Light Intensity' },
     backLightIntensity: { value: 1.0, min: 0, max: 10, step: 0.01, label: 'Back Light Intensity' },
+    upLightIntensity: { value: 2, min: 0, max: 10, step: 0.01, label: 'Up Light Intensity' },
     ambientLightIntensity: { value: 0.2, min: 0, max: 10, step: 0.01, label: 'Ambient Light Intensity' },
   })
 
@@ -36,6 +38,11 @@ export default function Lighting({ helper = false }) {
         scene.add(h)
         helpers.push(h)
       }
+      if (upLightRef.current) {
+        const h = new THREE.DirectionalLightHelper(upLightRef.current, 1, 'yellow')
+        scene.add(h)
+        helpers.push(h)
+      }
     }
     return () => {
       helpers.forEach(h => {
@@ -49,8 +56,8 @@ export default function Lighting({ helper = false }) {
   const actualKeyIntensity = enabled ? keyLightIntensity : 0
   const actualFillIntensity = enabled ? fillLightIntensity : 0
   const actualBackIntensity = enabled ? backLightIntensity : 0
+  const actualUpIntensity = enabled ? upLightIntensity : 0
   const actualAmbientIntensity = enabled ? ambientLightIntensity : 0
-
   return (
     <>
       {/* === Key Light ===
@@ -85,7 +92,12 @@ export default function Lighting({ helper = false }) {
         position={[-5, 10, -5]}
         intensity={actualBackIntensity}
       />
+      {/* === Up Light ===
+          Light from above the object.
+          Creates subtle highlights on the top surface.
+      */}
 
+      <directionalLight ref={upLightRef} position={[5, -10, 5]} intensity={actualUpIntensity} />
       {/* === Ambient Light ===
           Uniform ambient light for subtle base illumination.
       */}
