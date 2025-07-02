@@ -1,13 +1,13 @@
 import { CameraControls } from "@react-three/drei";
 import { Canvas } from '@react-three/fiber'
-import Head from './Head'
+import Head from '../component/Head.jsx'
 import AccumulatedBloomTrailEffect from "../component/AccumulatedBloomTrailEffect";
 import { Suspense } from "react";
-import Model from "./Model";
+import Model from "../component/Model.jsx";
 import { Environment } from "@react-three/drei";
 import { Leva } from 'leva';
 import { customTheme } from "../r3f-gist/theme/levaTheme.js";
-import Lighting from "./Lighting.jsx";
+import Lighting from "../component/Lighting.jsx";
 
 export default function App() {
     return <>
@@ -16,10 +16,10 @@ export default function App() {
         <Canvas
             shadows
             camera={{
-                fov: 45,
+                fov: 30,
                 near: 0.1,
                 far: 200,
-                position: [0, 0, 6]
+                position: [0, 1, 6]
             }}
         >
             <color attach="background" args={['#222222']} />
@@ -27,7 +27,7 @@ export default function App() {
             <Lighting helper={false} />
 
             <Suspense fallback={null}>
-                <Model path="ballerina_dance_smooth.fbx" scale={0.01} />
+                <Model path="ballerina_dance_smooth.fbx" scale={0.01} pos={[0, -1, 0]} />
             </Suspense>
             <AccumulatedBloomTrailEffect />
             {/* <Utilities /> */}

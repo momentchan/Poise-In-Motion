@@ -11,12 +11,12 @@ export default function AccumulatedBloomTrailEffect() {
   /* ==== UI sliders =========================================== */
   const controls = useControls('Accumulated Bloom Trail Effect', {
     Trail: folder({
-      blendFactor: { value: 0.4, min: 0, max: 1, step: 0.01 },
+      blendFactor: { value: 0.5, min: 0, max: 1, step: 0.01 },
       decay: { value: 0.9, min: 0, max: 0.995, step: 0.001 },
       delayFrames: { value: 10, min: 1, max: 100, step: 1 },
     }),
     Bloom: folder({
-      bloomThreshold: { value: 0.1, min: 0, max: 1, step: 0.01 },
+      bloomThreshold: { value: 0.15, min: 0, max: 1, step: 0.01 },
       bloomIntensity: { value: 0.6, min: 0, max: 3, step: 0.05 },
       bloomScatter: { value: 1.0, min: 0.3, max: 30, step: 0.1 },
       iterations: { value: 14, min: 1, max: 20, step: 1 },
@@ -26,11 +26,12 @@ export default function AccumulatedBloomTrailEffect() {
     SMAA: folder({
       smaaEnabled: { value: true},
       debug: { value: false },
-      edgeThreshold: { value: 0.1, min: 0.01, max: 0.5, step: 0.01},
+      edgeThreshold: { value: 0.3, min: 0.01, max: 0.5, step: 0.01},
+      smaaBlend: { value: 0.5, min: 0, max: 1, step: 0.01},
     }),
     Final: folder({
       finalColorOverlay: { value: '#ffffff' },
-      paperBlend: { value: 0.3, min: 0, max: 1, step: 0.01 }
+      paperBlend: { value: 0.15, min: 0, max: 1, step: 0.01 }
     }),
   })
 
@@ -122,7 +123,7 @@ export default function AccumulatedBloomTrailEffect() {
     runBrightPass(gl, displayRT, brightMat, brightScene, brightRT, quadCam)
     const bloomTex = runKawaseBlur(gl, brightRT, blurA, blurB, blurMat, blurScene, low, controls, quadCam)
     
-    // First do the bloom composite
+    // First do the bloom comp  osite
     compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, compositeRT, finalScene, quadCam, controls)
     
     // Then apply SMAA as final step
@@ -131,6 +132,7 @@ export default function AccumulatedBloomTrailEffect() {
       smaaMat.uniforms.debugMode.value = controls.debug
       smaaMat.uniforms.edgeThreshold.value = controls.edgeThreshold 
       smaaMat.uniforms.resolution.value.set(size.width, size.height)
+      smaaMat.uniforms.smaaBlend.value = controls.smaaBlend
       gl.setRenderTarget(null) // Render to screen
       gl.render(smaaScene, quadCam)
     }else{
