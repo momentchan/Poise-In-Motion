@@ -81,9 +81,12 @@ function addDepthCopyToFBX(fbx, material) {
     });
 }
 
-export default function Model({ path, pos, scale = 1 }) {
+export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0] }) {
     // === 1. Load FBX and Animations ===
     const fbx = useCustomFBX(path)
+
+
+    const [rot, setRot] = useState(initRot)
 
     const { ref, actions, names } = useAnimations(fbx.animations);
     const index = 0
@@ -148,15 +151,13 @@ export default function Model({ path, pos, scale = 1 }) {
 
         // Apply random rotation and position when animation finishes
         if (lastNorm.current > 0.95 && norm < 0.05 && ref.current) {
-            randomRotation.current = Math.random() * Math.PI * 2;
-            // Generate random offsets within the specified range
+            setRot([0, Math.random() * Math.PI * 2, 0])
             randomOffset.current = {
                 x: (Math.random() - 0.5) * controls.offsetRange * 2,
                 y: -0.5,
                 z: (Math.random() - 0.5) * controls.offsetRange * 2
             };
-            ref.current.rotation.y = randomRotation.current;
-            ref.current.position.set(randomOffset.current.x, randomOffset.current.y, randomOffset.current.z)
+            // ref.current.position.set(randomOffset.current.x, randomOffset.current.y, randomOffset.current.z)
         }
         lastNorm.current = norm;
         // Update shader uniforms and material properties
@@ -175,7 +176,7 @@ export default function Model({ path, pos, scale = 1 }) {
 
     // === 7. Render Model ===
     return (
-        <group ref={ref} position={pos}>
+        <group ref={ref} position={pos} rotation={rot}>
             <primitive scale={scale} object={fbx} />
         </group>
     )

@@ -12,22 +12,27 @@ export default function AccumulatedBloomTrailEffect() {
   const controls = useControls('Accumulated Bloom Trail Effect', {
     Trail: folder({
       blendFactor: { value: 0.5, min: 0, max: 1, step: 0.01 },
-      decay: { value: 0.9, min: 0, max: 0.995, step: 0.001 },
-      delayFrames: { value: 10, min: 1, max: 100, step: 1 },
+      decay: { value: 0.985, min: 0, max: 0.995, step: 0.001 },
+      delayFrames: { value: 40, min: 1, max: 100, step: 1 },
+      strength: { value: { x: 1.5, y: 0.2 }, min: 0, max: 2, step: 0.01 },
     }),
     Bloom: folder({
-      bloomThreshold: { value: 0.15, min: 0, max: 1, step: 0.01 },
-      bloomIntensity: { value: 0.6, min: 0, max: 3, step: 0.05 },
+      bloomThreshold: { value: 0.0, min: 0, max: 1, step: 0.01 },
+      bloomIntensity: { value: 1.2, min: 0, max: 3, step: 0.05 },
       bloomScatter: { value: 1.0, min: 0.3, max: 30, step: 0.1 },
       iterations: { value: 14, min: 1, max: 20, step: 1 },
       bloomScale: { value: 4, min: 1, max: 8, step: 1 },
       bloomBlend: { value: 0, min: 0, max: 1, step: 0.01 },
     }),
     SMAA: folder({
-      smaaEnabled: { value: true},
+      smaaEnabled: { value: true },
       debug: { value: false },
-      edgeThreshold: { value: 0.3, min: 0.01, max: 0.5, step: 0.01},
-      smaaBlend: { value: 0.5, min: 0, max: 1, step: 0.01},
+      edgeThreshold: { value: 1, min: 0.01, max: 0.5, step: 0.01 },
+      smaaBlend: { value: 0, min: 0, max: 1, step: 0.01 },
+    }),
+    Sharpen: folder({
+      sharpenEnabled: { value: true },
+      sharpenAmount: { value: 1, min: 0, max: 1, step: 0.01 },
     }),
     Final: folder({
       finalColorOverlay: { value: '#ffffff' },
@@ -51,6 +56,7 @@ export default function AccumulatedBloomTrailEffect() {
   const trailB = useFBO(size.width, size.height, fboParams)
   const displayRT = useFBO(size.width, size.height, fboParams)
   const compositeRT = useFBO(size.width, size.height, fboParams)
+  const sharpenRT = useFBO(size.width, size.height, fboParams)
 
   /* low-res bloom FBOs (created once, resized on window resize) */
   const low = useRef({ w: 1, h: 1 })
@@ -94,7 +100,52 @@ export default function AccumulatedBloomTrailEffect() {
   const finalMat = useMemo(() => createFinalMaterial(controls, paper), [controls, paper])
   const finalScene = useMemo(() => new THREE.Scene().add(new THREE.Mesh(quadGeo, finalMat)), [quadGeo, finalMat])
 
-  
+  const sharpenMat = useMemo(() => createSharpenMaterial(size), [size])
+  const sharpenScene = useMemo(() => new THREE.Scene().add(new THREE.Mesh(quadGeo, sharpenMat)), [quadGeo, sharpenMat])
+
+
+  function createSharpenMaterial(size) {
+    return new THREE.ShaderMaterial({
+    uniforms: {
+      tDiffuse:   { value: null },
+      resolution: { value: new THREE.Vector2(size.width, size.height) },
+      amount:     { value: 0.18 },
+    },
+    vertexShader: /* glsl */`
+      varying vec2 vUv;
+      void main(){ vUv = uv; gl_Position = vec4(position,1.); }`,
+    fragmentShader: /* glsl */`
+      uniform sampler2D tDiffuse;
+      uniform vec2  resolution;
+      uniform float amount;
+      varying vec2 vUv;
+
+      vec3 blur9(sampler2D tex, vec2 uv, vec2 res){
+        vec2 d = 1.0 / res;
+        vec3 s = vec3(0.);
+        s += texture2D(tex, uv + d * vec2(-1,-1)).rgb * 0.05;
+        s += texture2D(tex, uv + d * vec2( 0,-1)).rgb * 0.09;
+        s += texture2D(tex, uv + d * vec2( 1,-1)).rgb * 0.05;
+        s += texture2D(tex, uv + d * vec2(-1, 0)).rgb * 0.09;
+        s += texture2D(tex, uv).rgb             * 0.16;
+        s += texture2D(tex, uv + d * vec2( 1, 0)).rgb * 0.09;
+        s += texture2D(tex, uv + d * vec2(-1, 1)).rgb * 0.05;
+        s += texture2D(tex, uv + d * vec2( 0, 1)).rgb * 0.09;
+        s += texture2D(tex, uv + d * vec2( 1, 1)).rgb * 0.05;
+        return s;
+      }
+
+      void main(){
+        vec3 color = texture2D(tDiffuse, vUv).rgb;
+        vec3 blur  = blur9(tDiffuse, vUv, resolution);
+        vec3 high  = color - blur;
+        vec3 final = color + high * amount;
+        gl_FragColor = vec4(clamp(final,0.,1.),1.);
+      }`,
+    depthTest: false,
+    depthWrite: false,
+  })
+  }
 
   // Add SMAA render target
   const smaaRT = useMemo(() => {
@@ -122,22 +173,46 @@ export default function AccumulatedBloomTrailEffect() {
     mixCurrentAndTrail(gl, fboSource, trailTex, mixMat, displayRT, mixScene, quadCam)
     runBrightPass(gl, displayRT, brightMat, brightScene, brightRT, quadCam)
     const bloomTex = runKawaseBlur(gl, brightRT, blurA, blurB, blurMat, blurScene, low, controls, quadCam)
-    
+
     // First do the bloom comp  osite
     compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, compositeRT, finalScene, quadCam, controls)
-    
+
     // Then apply SMAA as final step
-    if (controls.smaaEnabled) {  
+    if (controls.smaaEnabled) {
       smaaMat.uniforms.tDiffuse.value = compositeRT.texture
       smaaMat.uniforms.debugMode.value = controls.debug
-      smaaMat.uniforms.edgeThreshold.value = controls.edgeThreshold 
+      smaaMat.uniforms.edgeThreshold.value = controls.edgeThreshold
       smaaMat.uniforms.resolution.value.set(size.width, size.height)
       smaaMat.uniforms.smaaBlend.value = controls.smaaBlend
-      gl.setRenderTarget(null) // Render to screen
-      gl.render(smaaScene, quadCam)
-    }else{
-      gl.setRenderTarget(null) // Render to screen
-      gl.render(finalScene, quadCam)
+
+      gl.setRenderTarget(sharpenRT);
+      gl.clear();
+      gl.render(smaaScene, quadCam);
+
+      if (controls.sharpenEnabled) {
+        sharpenMat.uniforms.tDiffuse.value = sharpenRT.texture;
+        sharpenMat.uniforms.amount.value = controls.sharpenAmount;
+        sharpenMat.uniforms.resolution.value.set(size.width, size.height);
+        gl.setRenderTarget(null);          
+        gl.render(sharpenScene, quadCam);
+      } else {
+        gl.setRenderTarget(null);
+        gl.render(smaaScene, quadCam);
+      }
+
+    } else {
+
+      const sourceTex = compositeRT.texture;
+      if (controls.sharpenEnabled) {
+        sharpenMat.uniforms.tDiffuse.value = sourceTex;
+        sharpenMat.uniforms.amount.value = controls.sharpenAmount;
+        sharpenMat.uniforms.resolution.value.set(size.width, size.height);
+        gl.setRenderTarget(null);
+        gl.render(sharpenScene, quadCam);
+      } else {
+        gl.setRenderTarget(null);
+        gl.render(finalScene, quadCam);
+      }
     }
   }, 1)
 
@@ -145,19 +220,24 @@ export default function AccumulatedBloomTrailEffect() {
 }
 
 /* === Helper Functions === */
-
-function createTrailMaterial({ decay, blendFactor }) {
+function createTrailMaterial({ decay }) {
   return new THREE.ShaderMaterial({
     uniforms: {
       current: { value: null },
       prev: { value: null },
       decay: { value: decay },
-      blendFactor: { value: blendFactor }
+      strength: { value: 1 },
     },
     vertexShader: /* glsl */ `varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position,1.);}`,
-    fragmentShader: /* glsl */ `uniform sampler2D current,prev;uniform float decay,blendFactor;
-      varying vec2 vUv;void main(){vec3 c=texture2D(current,vUv).rgb;
-      vec3 p=texture2D(prev,vUv).rgb*decay;gl_FragColor=vec4(clamp(c+p,0.,1.),1.);}`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D current,prev;
+      uniform float decay;
+      uniform float strength;
+      varying vec2 vUv;
+      void main(){
+        vec3 c = texture2D(current,vUv).rgb * strength;
+        vec3 p = texture2D(prev,vUv).rgb * decay;
+        gl_FragColor=vec4(clamp(c + p,0.,1.),1.);}`,
     depthTest: false, depthWrite: false
   })
 }
@@ -223,6 +303,10 @@ function createFinalMaterial({ bloomIntensity, finalColorOverlay, paperBlend, bl
         vec3 paperC= texture2D(paper,vUv).rgb;
         col = mix(col, BlendSoftLight(col,paperC), paperBlend);
         col *= finalColorOverlay;
+
+        float r = 0.;
+        col = mix(col, vec3(1.0), step(vUv.x, r) + step(1.-r, vUv.x));
+        // col = mix( col, 1.-col, step(vUv.x, 0.5));
         gl_FragColor = vec4(clamp(col,0.,1.),1.);
       }`,
     depthTest: false, depthWrite: false
@@ -239,18 +323,18 @@ function renderMainScene(gl, scene, camera, fboSource) {
 
 function updateTrail(gl, fboSource, trailA, trailB, trailMat, usePing, frame, controls, quadCam, trailScene) {
   frame.current++
-  if (frame.current % controls.delayFrames === 0) {
-    const prev = usePing.current ? trailA : trailB
-    const next = usePing.current ? trailB : trailA
-    trailMat.uniforms.current.value = fboSource.texture
-    trailMat.uniforms.prev.value = prev.texture
-    trailMat.uniforms.decay.value = controls.decay
-    trailMat.uniforms.blendFactor.value = controls.blendFactor
-    gl.setRenderTarget(next)
-    gl.clear()
-    gl.render(trailScene, quadCam)
-    usePing.current = !usePing.current
-  }
+  // if (frame.current % controls.delayFrames === 0) {
+  const prev = usePing.current ? trailA : trailB
+  const next = usePing.current ? trailB : trailA
+  trailMat.uniforms.current.value = fboSource.texture
+  trailMat.uniforms.prev.value = prev.texture
+  trailMat.uniforms.decay.value = controls.decay
+  trailMat.uniforms.strength.value = frame.current % controls.delayFrames === 0 ? controls.strength.x : controls.strength.y
+  gl.setRenderTarget(next)
+  gl.clear()
+  gl.render(trailScene, quadCam)
+  usePing.current = !usePing.current
+  // }
 }
 
 function mixCurrentAndTrail(gl, fboSource, trailTex, mixMat, displayRT, mixScene, quadCam) {
