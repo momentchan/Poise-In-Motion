@@ -7,7 +7,7 @@ import { folder, useControls } from 'leva'
 import photoshopMath from '../r3f-gist/shader/cginc/photoshopMath.glsl?raw'
 import { createSMAAMaterial } from '../r3f-gist/effect/SMAAEffect'
 
-export default function AccumulatedBloomTrailEffect() {
+export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
   /* ==== UI sliders =========================================== */
   const controls = useControls('Accumulated Bloom Trail Effect', {
     Trail: folder({
@@ -167,6 +167,7 @@ export default function AccumulatedBloomTrailEffect() {
 
   /* ==== frame loop ============================================ */
   useFrame(() => {
+    if (isPaused) return;
     renderMainScene(gl, scene, camera, fboSource)
     updateTrail(gl, fboSource, trailA, trailB, trailMat, usePing, frame, controls, quadCam, trailScene)
     const trailTex = (usePing.current ? trailA : trailB).texture

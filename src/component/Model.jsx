@@ -81,10 +81,9 @@ function addDepthCopyToFBX(fbx, material) {
     });
 }
 
-export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0] }) {
+export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0], isPaused = false }) {
     // === 1. Load FBX and Animations ===
     const fbx = useCustomFBX(path)
-
 
     const [rot, setRot] = useState(initRot)
 
@@ -94,7 +93,6 @@ export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0] }) {
     const currentAction = useRef(null)
     const randomRotation = useRef(Math.random() * Math.PI * 2) // Random angle between 0 and 2π
     const randomOffset = useRef({ x: 0, z: 0 }) // Random position offset on XZ plane
-    const isPaused = useRef(false)
 
     // === 2. Gather all Leva controls in a single object ===
     const control = {
@@ -116,23 +114,6 @@ export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0] }) {
         const action = actions[names[index]];
         action.play();
         currentAction.current = action;
-
-        // Add space key event listener
-        const handleKeyPress = (event) => {
-            if (event.code === 'Space') {
-                isPaused.current = !isPaused.current;
-                if (isPaused.current) {
-                    currentAction.current.paused = true;
-                } else {
-                    currentAction.current.paused = false;
-                }
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyPress);
-        return () => {
-            window.removeEventListener('keydown', handleKeyPress);
-        };
     }, [actions, names, index]);
 
     // === 5. Add Depth Copy to FBX Meshes ===
@@ -145,6 +126,14 @@ export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0] }) {
     const lastNorm = useRef(0);
     useFrame(() => {
         if (!currentAction.current) return;
+        
+        // Handle pause state
+        if (isPaused) {
+            currentAction.current.paused = true;
+        } else {
+            currentAction.current.paused = false;
+        }
+        
         const clip = currentAction.current.getClip ? currentAction.current.getClip() : currentAction.current._clip;
         const dur = clip.duration;
         const norm = (currentAction.current.time % dur) / dur;
