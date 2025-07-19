@@ -24,7 +24,7 @@ export default function App() {
             window.removeEventListener('keydown', handleKeyPress);
         };
     }, []);
-
+ 
     return <>
         <Leva theme={customTheme} hidden={false} />  
 
@@ -34,7 +34,7 @@ export default function App() {
                 fov: 30,
                 near: 0.1,
                 far: 200,
-                position: [0, 1, 5]
+                position: [0, 1, 5.5]
             }}
         >
             <color attach="background" args={['#000000']} />

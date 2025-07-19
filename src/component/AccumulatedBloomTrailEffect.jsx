@@ -28,7 +28,7 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
       smaaEnabled: { value: true },
       debug: { value: false },
       edgeThreshold: { value: 1, min: 0.01, max: 0.5, step: 0.01 },
-      smaaBlend: { value: 0, min: 0, max: 1, step: 0.01 },
+      smaaBlend: { value: 0.4, min: 0, max: 1, step: 0.01 },
     }),
     Sharpen: folder({
       sharpenEnabled: { value: true },
@@ -106,15 +106,15 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
 
   function createSharpenMaterial(size) {
     return new THREE.ShaderMaterial({
-    uniforms: {
-      tDiffuse:   { value: null },
-      resolution: { value: new THREE.Vector2(size.width, size.height) },
-      amount:     { value: 0.18 },
-    },
-    vertexShader: /* glsl */`
+      uniforms: {
+        tDiffuse: { value: null },
+        resolution: { value: new THREE.Vector2(size.width, size.height) },
+        amount: { value: 0.18 },
+      },
+      vertexShader: /* glsl */`
       varying vec2 vUv;
       void main(){ vUv = uv; gl_Position = vec4(position,1.); }`,
-    fragmentShader: /* glsl */`
+      fragmentShader: /* glsl */`
       uniform sampler2D tDiffuse;
       uniform vec2  resolution;
       uniform float amount;
@@ -142,9 +142,9 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
         vec3 final = color + high * amount;
         gl_FragColor = vec4(clamp(final,0.,1.),1.);
       }`,
-    depthTest: false,
-    depthWrite: false,
-  })
+      depthTest: false,
+      depthWrite: false,
+    })
   }
 
   // Add SMAA render target
@@ -167,9 +167,10 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
 
   /* ==== frame loop ============================================ */
   useFrame(() => {
-    if (isPaused) return;
     renderMainScene(gl, scene, camera, fboSource)
-    updateTrail(gl, fboSource, trailA, trailB, trailMat, usePing, frame, controls, quadCam, trailScene)
+    if (!isPaused) {
+      updateTrail(gl, fboSource, trailA, trailB, trailMat, usePing, frame, controls, quadCam, trailScene)
+    }
     const trailTex = (usePing.current ? trailA : trailB).texture
     mixCurrentAndTrail(gl, fboSource, trailTex, mixMat, displayRT, mixScene, quadCam)
     runBrightPass(gl, displayRT, brightMat, brightScene, brightRT, quadCam)
@@ -194,7 +195,7 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
         sharpenMat.uniforms.tDiffuse.value = sharpenRT.texture;
         sharpenMat.uniforms.amount.value = controls.sharpenAmount;
         sharpenMat.uniforms.resolution.value.set(size.width, size.height);
-        gl.setRenderTarget(null);          
+        gl.setRenderTarget(null);
         gl.render(sharpenScene, quadCam);
       } else {
         gl.setRenderTarget(null);
@@ -272,7 +273,8 @@ function createMixMaterial({ blendFactor }) {
     vertexShader: /* glsl */ `varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position,1.);}`,
     fragmentShader: /* glsl */ `uniform sampler2D current,trail;uniform float blend;varying vec2 vUv;
       void main(){vec3 c=texture2D(current,vUv).rgb;
-      vec3 t=texture2D(trail,vUv).rgb;gl_FragColor=vec4(clamp(c+t*blend,0.,1.),1.);}`,
+      vec3 t=texture2D(trail,vUv).rgb;
+      gl_FragColor=vec4(clamp(c +t*blend,0.,1.),1.);}`,
     depthTest: false, depthWrite: false
   })
 }
@@ -305,7 +307,7 @@ function createFinalMaterial({ bloomIntensity, finalColorOverlay, paperBlend, bl
         col = mix(col, BlendSoftLight(col,paperC), paperBlend);
         col *= finalColorOverlay;
 
-        float r = 0.;
+        float r = 0.0;//0.109;
         col = mix(col, vec3(1.0), step(vUv.x, r) + step(1.-r, vUv.x));
         // col = mix( col, 1.-col, step(vUv.x, 0.5));
         gl_FragColor = vec4(clamp(col,0.,1.),1.);
@@ -324,7 +326,6 @@ function renderMainScene(gl, scene, camera, fboSource) {
 
 function updateTrail(gl, fboSource, trailA, trailB, trailMat, usePing, frame, controls, quadCam, trailScene) {
   frame.current++
-  // if (frame.current % controls.delayFrames === 0) {
   const prev = usePing.current ? trailA : trailB
   const next = usePing.current ? trailB : trailA
   trailMat.uniforms.current.value = fboSource.texture
@@ -335,7 +336,6 @@ function updateTrail(gl, fboSource, trailA, trailB, trailMat, usePing, frame, co
   gl.clear()
   gl.render(trailScene, quadCam)
   usePing.current = !usePing.current
-  // }
 }
 
 function mixCurrentAndTrail(gl, fboSource, trailTex, mixMat, displayRT, mixScene, quadCam) {

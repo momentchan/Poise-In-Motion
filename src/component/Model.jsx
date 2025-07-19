@@ -6,6 +6,7 @@ import { useControls } from "leva";
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import CustomShaderMaterial from "three-custom-shader-material/vanilla";
 import { useCustomFBX } from "./useCustomFBX";
+import photoshopMath from "../r3f-gist/shader/cginc/photoshopMath.glsl?raw";
 
 // === Helper: Create Custom Material ===
 function createCustomMaterial(params) {
@@ -24,17 +25,58 @@ function createCustomMaterial(params) {
             uFresnelColor: { value: new THREE.Color(fresnelColor) },
             uFresnelPow: { value: fresnelPower },
             uRatio: { value: 0 },
+            uTime: { value: 0 },
+            uHsvRange: { value: new THREE.Vector3(0, 1, 1) }, // min HSV
+            uHsvRangeMax: { value: new THREE.Vector3(1, 1, 1) }, // max HSV
+            uColorCycleSpeed: { value: 0.5 },
+            uUseHsvMode: { value: false },
         },
         fragmentShader: /* glsl */ `
+            ${photoshopMath}
+            
             uniform vec3  uBaseColor;
             uniform vec3  uFresnelColor;
             uniform float uFresnelPow;
             uniform float uRatio;
+            uniform float uTime;
+            uniform vec3  uHsvRange;
+            uniform vec3  uHsvRangeMax;
+            uniform float uColorCycleSpeed;
+            uniform bool  uUseHsvMode;
+            
+            vec3 cycleColorInRange(vec3 baseColor, vec3 minHsv, vec3 maxHsv, float time) {
+                vec3 hsv = rgb2hsv(baseColor);
+                
+                // Calculate the range for each component
+                vec3 range = maxHsv - minHsv;
+                
+                // Create a cycling value between 0 and 1
+                float cycle = fract(time * uColorCycleSpeed);
+                
+                // Interpolate within the HSV range
+                vec3 newHsv = minHsv + range * cycle;
+                
+                // Ensure hue wraps properly (0-1 range)
+                newHsv.x = fract(newHsv.x);
+                
+                // Clamp saturation and value to valid ranges
+                newHsv.y = clamp(newHsv.y, 0.0, 1.0);
+                newHsv.z = clamp(newHsv.z, 0.0, 1.0);
+                
+                return hsv2rgb(newHsv);
+            }
+            
             void main() {
                 vec3 N = normalize(vNormal);
                 vec3 V = normalize(vViewPosition);
                 float fresnel = pow(1.0 - max(dot(N, V), 0.0), uFresnelPow);
                 vec3 color = mix(uBaseColor, uFresnelColor, fresnel);
+                
+                // Cycle color within the specified HSV range only if HSV mode is enabled
+                if (uUseHsvMode) {
+                    color = cycleColorInRange(color, uHsvRange, uHsvRangeMax, uTime);
+                }
+                
                 float ratio = smoothstep(0.0, 0.02, uRatio) * smoothstep(1.0, 0.98, uRatio);
                 color += ambientLightColor;
                 csm_DiffuseColor = vec4(color, fresnel * ratio);
@@ -103,8 +145,24 @@ export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0], isPau
         metalness: { value: 1, min: 0, max: 1, step: 0.01, label: "Metalness" },
         wireframe: { value: false, label: "Wireframe" },
         offsetRange: { value: 2, min: 0, max: 5, step: 0.1, label: "Position Offset Range" },
+        useHsvMode: { value: false, label: "Enable HSV Mode" },
+        colorCycleSpeed: { value: 0.001, min: 0, max: 0.01, step: 0.001, label: "Color Cycle Speed" },
+        hsvRangeMin: { 
+            value: { x: 0, y: 0.5, z: 1 }, 
+            label: "HSV Range Min",
+            step: 0.01,
+            min: 0,
+            max: 1
+        },
+        hsvRangeMax: { 
+            value: { x: 1, y: 0.5, z: 1 }, 
+            label: "HSV Range Max",
+            step: 0.01,
+            min: 0,
+            max: 1
+        },
     };
-    const controls = useControls("Model Shader", control);
+    const controls = useControls("Model Shader", control, { collapsed: true });
 
     // === 3. Material Setup ===
     const material = useMemo(() => createCustomMaterial(controls), [controls]);
@@ -124,7 +182,7 @@ export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0], isPau
 
     // === 6. Animation Frame Updates ===
     const lastNorm = useRef(0);
-    useFrame(() => {
+    useFrame((state) => {
         if (!currentAction.current) return;
         
         // Handle pause state
@@ -156,6 +214,11 @@ export default function Model({ path, pos, scale = 1, initRot = [0, 0, 0], isPau
             if (material.uniforms.uFresnelColor) material.uniforms.uFresnelColor.value.set(controls.fresnelColor);
             if (material.uniforms.uFresnelPow) material.uniforms.uFresnelPow.value = controls.fresnelPower;
             if (material.uniforms.uRatio) material.uniforms.uRatio.value = norm;
+            if (material.uniforms.uTime) material.uniforms.uTime.value += state.clock.elapsedTime;
+            if (material.uniforms.uColorCycleSpeed) material.uniforms.uColorCycleSpeed.value = controls.colorCycleSpeed;
+            if (material.uniforms.uUseHsvMode) material.uniforms.uUseHsvMode.value = controls.useHsvMode;
+            if (material.uniforms.uHsvRange) material.uniforms.uHsvRange.value.set(controls.hsvRangeMin.x, controls.hsvRangeMin.y, controls.hsvRangeMin.z);
+            if (material.uniforms.uHsvRangeMax) material.uniforms.uHsvRangeMax.value.set(controls.hsvRangeMax.x, controls.hsvRangeMax.y, controls.hsvRangeMax.z);
             // Material properties
             material.roughness = controls.roughness;
             material.metalness = controls.metalness;

@@ -18,7 +18,7 @@ export default function Lighting({ helper = false }) {
     backLightIntensity: { value: 1.0, min: 0, max: 10, step: 0.01, label: 'Back Light Intensity' },
     upLightIntensity: { value: 2, min: 0, max: 10, step: 0.01, label: 'Up Light Intensity' },
     ambientLightIntensity: { value: 0.2, min: 0, max: 10, step: 0.01, label: 'Ambient Light Intensity' },
-  })
+  }, { collapsed: true })
 
   useEffect(() => {
     const helpers = []
