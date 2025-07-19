@@ -5,7 +5,6 @@ import { useFBO, useTexture } from '@react-three/drei'
 import { useRef, useMemo, useEffect } from 'react'
 import { folder, useControls } from 'leva'
 import photoshopMath from '../r3f-gist/shader/cginc/photoshopMath.glsl?raw'
-import { createSMAAMaterial } from '../r3f-gist/effect/SMAAEffect'
 
 export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
   /* ==== UI sliders =========================================== */
@@ -24,16 +23,6 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
       bloomScale: { value: 4, min: 1, max: 8, step: 1 },
       bloomBlend: { value: 0, min: 0, max: 1, step: 0.01 },
     }),
-    SMAA: folder({
-      smaaEnabled: { value: true },
-      debug: { value: false },
-      edgeThreshold: { value: 1, min: 0.01, max: 0.5, step: 0.01 },
-      smaaBlend: { value: 0.4, min: 0, max: 1, step: 0.01 },
-    }),
-    Sharpen: folder({
-      sharpenEnabled: { value: true },
-      sharpenAmount: { value: 1, min: 0, max: 1, step: 0.01 },
-    }),
     Final: folder({
       finalColorOverlay: { value: '#ffffff' },
       paperBlend: { value: 0.15, min: 0, max: 1, step: 0.01 }
@@ -49,20 +38,31 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
     format: THREE.RGBAFormat,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
+    stencilBuffer: false,
+    samples: 4
+  }), [])
+
+  /* low-res FBOs (no MSAA for performance) */
+  const lowResFboParams = useMemo(() => ({
+    type: THREE.HalfFloatType,
+    format: THREE.RGBAFormat,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
     stencilBuffer: false
   }), [])
-  const fboSource = useFBO(size.width, size.height, fboParams)
-  const trailA = useFBO(size.width, size.height, fboParams)
-  const trailB = useFBO(size.width, size.height, fboParams)
-  const displayRT = useFBO(size.width, size.height, fboParams)
-  const compositeRT = useFBO(size.width, size.height, fboParams)
-  const sharpenRT = useFBO(size.width, size.height, fboParams)
+
+  const dpr = gl.getPixelRatio()
+  const fboSource = useFBO(size.width * dpr, size.height * dpr, fboParams)
+  const trailA = useFBO(size.width * dpr, size.height * dpr, fboParams)
+  const trailB = useFBO(size.width * dpr, size.height * dpr, fboParams)
+  const displayRT = useFBO(size.width * dpr, size.height * dpr, fboParams)
+  const compositeRT = useFBO(size.width * dpr, size.height * dpr, fboParams)
 
   /* low-res bloom FBOs (created once, resized on window resize) */
   const low = useRef({ w: 1, h: 1 })
-  const brightRT = useFBO(1, 1, fboParams)
-  const blurA = useFBO(1, 1, fboParams)
-  const blurB = useFBO(1, 1, fboParams)
+  const brightRT = useFBO(1, 1, lowResFboParams)
+  const blurA = useFBO(1, 1, lowResFboParams)
+  const blurB = useFBO(1, 1, lowResFboParams)
 
   const rebuildLowRes = () => {
     const w = Math.max(1, Math.floor(size.width / controls.bloomScale))
@@ -100,70 +100,7 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
   const finalMat = useMemo(() => createFinalMaterial(controls, paper), [controls, paper])
   const finalScene = useMemo(() => new THREE.Scene().add(new THREE.Mesh(quadGeo, finalMat)), [quadGeo, finalMat])
 
-  const sharpenMat = useMemo(() => createSharpenMaterial(size), [size])
-  const sharpenScene = useMemo(() => new THREE.Scene().add(new THREE.Mesh(quadGeo, sharpenMat)), [quadGeo, sharpenMat])
 
-
-  function createSharpenMaterial(size) {
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        tDiffuse: { value: null },
-        resolution: { value: new THREE.Vector2(size.width, size.height) },
-        amount: { value: 0.18 },
-      },
-      vertexShader: /* glsl */`
-      varying vec2 vUv;
-      void main(){ vUv = uv; gl_Position = vec4(position,1.); }`,
-      fragmentShader: /* glsl */`
-      uniform sampler2D tDiffuse;
-      uniform vec2  resolution;
-      uniform float amount;
-      varying vec2 vUv;
-
-      vec3 blur9(sampler2D tex, vec2 uv, vec2 res){
-        vec2 d = 1.0 / res;
-        vec3 s = vec3(0.);
-        s += texture2D(tex, uv + d * vec2(-1,-1)).rgb * 0.05;
-        s += texture2D(tex, uv + d * vec2( 0,-1)).rgb * 0.09;
-        s += texture2D(tex, uv + d * vec2( 1,-1)).rgb * 0.05;
-        s += texture2D(tex, uv + d * vec2(-1, 0)).rgb * 0.09;
-        s += texture2D(tex, uv).rgb             * 0.16;
-        s += texture2D(tex, uv + d * vec2( 1, 0)).rgb * 0.09;
-        s += texture2D(tex, uv + d * vec2(-1, 1)).rgb * 0.05;
-        s += texture2D(tex, uv + d * vec2( 0, 1)).rgb * 0.09;
-        s += texture2D(tex, uv + d * vec2( 1, 1)).rgb * 0.05;
-        return s;
-      }
-
-      void main(){
-        vec3 color = texture2D(tDiffuse, vUv).rgb;
-        vec3 blur  = blur9(tDiffuse, vUv, resolution);
-        vec3 high  = color - blur;
-        vec3 final = color + high * amount;
-        gl_FragColor = vec4(clamp(final,0.,1.),1.);
-      }`,
-      depthTest: false,
-      depthWrite: false,
-    })
-  }
-
-  // Add SMAA render target
-  const smaaRT = useMemo(() => {
-    const rt = new THREE.WebGLRenderTarget(size.width, size.height, {
-      format: THREE.RGBAFormat,
-      type: THREE.UnsignedByteType,
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-    })
-    rt.texture.name = "SMAA"
-    return rt
-  }, [size])
-
-
-  // Create SMAA material
-  const smaaMat = useMemo(() => createSMAAMaterial(size, false, 0.1), [size])
-
-  const smaaScene = useMemo(() => new THREE.Scene().add(new THREE.Mesh(quadGeo, smaaMat)), [quadGeo, smaaMat])
 
   /* ==== frame loop ============================================ */
   useFrame(() => {
@@ -176,46 +113,13 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
     runBrightPass(gl, displayRT, brightMat, brightScene, brightRT, quadCam)
     const bloomTex = runKawaseBlur(gl, brightRT, blurA, blurB, blurMat, blurScene, low, controls, quadCam)
 
-    // First do the bloom comp  osite
+        // Composite to screen
     compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, compositeRT, finalScene, quadCam, controls)
-
-    // Then apply SMAA as final step
-    if (controls.smaaEnabled) {
-      smaaMat.uniforms.tDiffuse.value = compositeRT.texture
-      smaaMat.uniforms.debugMode.value = controls.debug
-      smaaMat.uniforms.edgeThreshold.value = controls.edgeThreshold
-      smaaMat.uniforms.resolution.value.set(size.width, size.height)
-      smaaMat.uniforms.smaaBlend.value = controls.smaaBlend
-
-      gl.setRenderTarget(sharpenRT);
-      gl.clear();
-      gl.render(smaaScene, quadCam);
-
-      if (controls.sharpenEnabled) {
-        sharpenMat.uniforms.tDiffuse.value = sharpenRT.texture;
-        sharpenMat.uniforms.amount.value = controls.sharpenAmount;
-        sharpenMat.uniforms.resolution.value.set(size.width, size.height);
-        gl.setRenderTarget(null);
-        gl.render(sharpenScene, quadCam);
-      } else {
-        gl.setRenderTarget(null);
-        gl.render(smaaScene, quadCam);
-      }
-
-    } else {
-
-      const sourceTex = compositeRT.texture;
-      if (controls.sharpenEnabled) {
-        sharpenMat.uniforms.tDiffuse.value = sourceTex;
-        sharpenMat.uniforms.amount.value = controls.sharpenAmount;
-        sharpenMat.uniforms.resolution.value.set(size.width, size.height);
-        gl.setRenderTarget(null);
-        gl.render(sharpenScene, quadCam);
-      } else {
-        gl.setRenderTarget(null);
-        gl.render(finalScene, quadCam);
-      }
-    }
+    
+    // Render final result
+    gl.setRenderTarget(null)
+    gl.clear()
+    gl.render(finalScene, quadCam)
   }, 1)
 
   return null
@@ -310,7 +214,11 @@ function createFinalMaterial({ bloomIntensity, finalColorOverlay, paperBlend, bl
         float r = 0.0;//0.109;
         col = mix(col, vec3(1.0), step(vUv.x, r) + step(1.-r, vUv.x));
         // col = mix( col, 1.-col, step(vUv.x, 0.5));
-        gl_FragColor = vec4(clamp(col,0.,1.),1.);
+        gl_FragColor = vec4(col,1.);
+
+        gl_FragColor.rgb = toneMapping(gl_FragColor.rgb);
+        // gl_FragColor = LinearTosRGB(gl_FragColor);
+
       }`,
     depthTest: false, depthWrite: false
   })
