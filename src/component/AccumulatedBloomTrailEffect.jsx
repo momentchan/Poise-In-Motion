@@ -12,12 +12,14 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
     Trail: folder({
       blendFactor: { value: 0.5, min: 0, max: 1, step: 0.01 },
       decay: { value: 0.985, min: 0, max: 0.995, step: 0.001 },
-      delayFrames: { value: 40, min: 1, max: 100, step: 1 },
-      strength: { value: { x: 1.5, y: 0.2 }, min: 0, max: 2, step: 0.01 },
+      delayFrames: { value: 30, min: 1, max: 100, step: 1 },
+      // strength: { value: { x: 1.5, y: 0.3 }, min: 0, max: 2, step: 0.01 }, 
+      strength: { value: { x: 1.5, y:2 }, min: 0, max: 2, step: 0.01 }, 
     }),
     Bloom: folder({
-      bloomThreshold: { value: 0.0, min: 0, max: 1, step: 0.01 },
-      bloomIntensity: { value: 1.2, min: 0, max: 3, step: 0.05 },
+      // bloomThreshold: { value: 0.0, min: 0, max: 1, step: 0.01 },
+      bloomThreshold: { value: 0.7, min: 0, max: 1, step: 0.01 },
+      bloomIntensity: { value: 1.6, min: 0, max: 3, step: 0.05 },
       bloomScatter: { value: 1.0, min: 0.3, max: 30, step: 0.1 },
       iterations: { value: 14, min: 1, max: 20, step: 1 },
       bloomScale: { value: 4, min: 1, max: 8, step: 1 },
@@ -25,7 +27,8 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
     }),
     Final: folder({
       finalColorOverlay: { value: '#ffffff' },
-      paperBlend: { value: 0.15, min: 0, max: 1, step: 0.01 }
+      // paperBlend: { value: 0.15, min: 0, max: 1, step: 0.01 }
+      paperBlend: { value: 0.45, min: 0, max: 1, step: 0.01 }
     }),
   })
 
@@ -215,12 +218,12 @@ function createFinalMaterial({ bloomIntensity, finalColorOverlay, paperBlend, bl
         col = mix(col, vec3(1.0), step(vUv.x, r) + step(1.-r, vUv.x));
         // col = mix( col, 1.-col, step(vUv.x, 0.5));
         gl_FragColor = vec4(col,1.);
-
-        gl_FragColor.rgb = toneMapping(gl_FragColor.rgb);
+        // gl_FragColor.rgb = toneMapping(gl_FragColor.rgb);
         // gl_FragColor = LinearTosRGB(gl_FragColor);
 
       }`,
-    depthTest: false, depthWrite: false
+    depthTest: false, depthWrite: false,
+    toneMapped:true
   })
 }
 

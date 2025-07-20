@@ -11,11 +11,14 @@ import Lighting from "../component/Lighting.jsx";
 
 export default function App() { 
     const [isPaused, setIsPaused] = useState(false);
+    const [hidden, setHidden] = useState(false);
 
     useEffect(() => {
         const handleKeyPress = (event) => {
             if (event.code === 'Space') {
                 setIsPaused(prev => !prev);
+            } else if (event.code === 'KeyH') {
+                setHidden(prev => !prev);
             }
         };
 
@@ -26,7 +29,7 @@ export default function App() {
     }, []);
  
     return <>
-        <Leva theme={customTheme} hidden={false} />  
+        <Leva theme={customTheme} hidden={hidden} />  
 
         <Canvas
             shadows
@@ -36,7 +39,7 @@ export default function App() {
                 far: 200,
                 position: [0, 1, 5.5]
             }}
-        >
+         >
             <color attach="background" args={['#000000']} />
             <CameraControls makeDefault />
             <Lighting helper={false} />
