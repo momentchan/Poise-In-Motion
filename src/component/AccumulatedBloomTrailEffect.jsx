@@ -87,7 +87,7 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
   /* misc state */
   const usePing = useRef(true);    // ping-pong toggle for trail
   const frame = useRef(0)
-  const paper = useTexture('/paper.png')
+  const paper = useTexture('paper.png')
 
   /* ==== full-screen quad parts (trail / bright / blur / mix / final) ==== */
   const quadCam = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), [])
