@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useControls } from 'leva'
+import { useControls, folder  } from 'leva'
 
 export default function Lighting({ helper = false }) {
   const keyLightRef = useRef()
@@ -11,13 +11,21 @@ export default function Lighting({ helper = false }) {
   const { scene } = useThree()
 
   // Leva controls for all light intensities
-  const { enabled, keyLightIntensity, fillLightIntensity, backLightIntensity, ambientLightIntensity, upLightIntensity } = useControls('Lighting', {
-    enabled: { value: true, label: 'Enable Lighting' },
-    keyLightIntensity: { value: 0.8, min: 0, max: 10, step: 0.01, label: 'Key Light Intensity' },
-    fillLightIntensity: { value: 0.5, min: 0, max: 10, step: 0.01, label: 'Fill Light Intensity' },
-    backLightIntensity: { value: 1.0, min: 0, max: 10, step: 0.01, label: 'Back Light Intensity' },
-    upLightIntensity: { value: 2, min: 0, max: 10, step: 0.01, label: 'Up Light Intensity' },
-    ambientLightIntensity: { value: 0.2, min: 0, max: 10, step: 0.01, label: 'Ambient Light Intensity' },
+  const { keyLightEnabled, fillLightEnabled, backLightEnabled, upLightEnabled, ambientLightEnabled, keyLightIntensity, fillLightIntensity, backLightIntensity, ambientLightIntensity, upLightIntensity } = useControls('Lighting', {
+    Lights: folder({
+      keyLightEnabled: { value: true, label: 'Key Light' },
+      fillLightEnabled: { value: true, label: 'Fill Light' },
+      backLightEnabled: { value: true, label: 'Back Light' },
+      upLightEnabled: { value: true, label: 'Up Light' },
+      ambientLightEnabled: { value: true, label: 'Ambient Light' },
+    }),
+    Intensities: folder({
+      keyLightIntensity: { value: 2, min: 0, max: 10, step: 0.01, label: 'Key Light Intensity' },
+      fillLightIntensity: { value: 0.5, min: 0, max: 10, step: 0.01, label: 'Fill Light Intensity' },
+      backLightIntensity: { value: 1.5, min: 0, max: 10, step: 0.01, label: 'Back Light Intensity' },
+      upLightIntensity: { value: 2, min: 0, max: 10, step: 0.01, label: 'Up Light Intensity' },
+      ambientLightIntensity: { value: 0.2, min: 0, max: 100, step: 0.01, label: 'Ambient Light Intensity' },
+    }),
   }, { collapsed: true })
 
   useEffect(() => {
@@ -52,12 +60,12 @@ export default function Lighting({ helper = false }) {
     }
   }, [helper, scene])
 
-  // Calculate actual intensities based on enabled state
-  const actualKeyIntensity = enabled ? keyLightIntensity : 0
-  const actualFillIntensity = enabled ? fillLightIntensity : 0
-  const actualBackIntensity = enabled ? backLightIntensity : 0
-  const actualUpIntensity = enabled ? upLightIntensity : 0
-  const actualAmbientIntensity = enabled ? ambientLightIntensity : 0
+  // Calculate actual intensities based on enabled state and individual light toggles
+  const actualKeyIntensity = keyLightEnabled ? keyLightIntensity : 0
+  const actualFillIntensity = fillLightEnabled ? fillLightIntensity : 0
+  const actualBackIntensity = backLightEnabled ? backLightIntensity : 0
+  const actualUpIntensity = upLightEnabled ? upLightIntensity : 0
+  const actualAmbientIntensity = ambientLightEnabled ? ambientLightIntensity : 0
   return (
     <>
       {/* === Key Light ===

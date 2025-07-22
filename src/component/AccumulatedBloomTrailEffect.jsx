@@ -9,16 +9,22 @@ import photoshopMath from '../r3f-gist/shader/cginc/photoshopMath.glsl?raw'
 export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
   /* ==== UI sliders =========================================== */
   const controls = useControls('Accumulated Bloom Trail Effect', {
+    Effects: folder({
+      trailEnabled: { value: true, label: "Trail Effect" },
+      bloomEnabled: { value: true, label: "Bloom Effect" },
+      paperEnabled: { value: true, label: "Paper Texture" },
+      colorOverlayEnabled: { value: true, label: "Color Overlay" },
+    }),
     Trail: folder({
       blendFactor: { value: 0.5, min: 0, max: 1, step: 0.01 },
       decay: { value: 0.985, min: 0, max: 0.995, step: 0.001 },
       delayFrames: { value: 30, min: 1, max: 100, step: 1 },
-      // strength: { value: { x: 1.5, y: 0.3 }, min: 0, max: 2, step: 0.01 }, 
-      strength: { value: { x: 1.5, y:2 }, min: 0, max: 2, step: 0.01 }, 
+      strength: { value: { x: 1.5, y: 0.3 }, min: 0, max: 2, step: 0.01 },
+      // strength: { value: { x: 1.5, y:2 }, min: 0, max: 2, step: 0.01 }, 
     }),
     Bloom: folder({
-      // bloomThreshold: { value: 0.0, min: 0, max: 1, step: 0.01 },
-      bloomThreshold: { value: 0.7, min: 0, max: 1, step: 0.01 },
+      bloomThreshold: { value: 0.0, min: 0, max: 1, step: 0.01 },
+      // bloomThreshold: { value: 0.7, min: 0, max: 1, step: 0.01 },
       bloomIntensity: { value: 1.6, min: 0, max: 3, step: 0.05 },
       bloomScatter: { value: 1.0, min: 0.3, max: 30, step: 0.1 },
       iterations: { value: 14, min: 1, max: 20, step: 1 },
@@ -27,8 +33,8 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
     }),
     Final: folder({
       finalColorOverlay: { value: '#ffffff' },
-      // paperBlend: { value: 0.15, min: 0, max: 1, step: 0.01 }
-      paperBlend: { value: 0.45, min: 0, max: 1, step: 0.01 }
+      paperBlend: { value: 0.3, min: 0, max: 1, step: 0.01 }
+      // paperBlend: { value: 0.45, min: 0, max: 1, step: 0.01 }
     }),
   })
 
@@ -108,18 +114,23 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
   /* ==== frame loop ============================================ */
   useFrame(() => {
     renderMainScene(gl, scene, camera, fboSource)
+
     if (!isPaused) {
       updateTrail(gl, fboSource, trailA, trailB, trailMat, usePing, frame, controls, quadCam, trailScene)
     }
+
     const trailTex = (usePing.current ? trailA : trailB).texture
     mixCurrentAndTrail(gl, fboSource, trailTex, mixMat, displayRT, mixScene, quadCam)
+
     runBrightPass(gl, displayRT, brightMat, brightScene, brightRT, quadCam)
     const bloomTex = runKawaseBlur(gl, brightRT, blurA, blurB, blurMat, blurScene, low, controls, quadCam)
 
-        // Composite to screen
-    compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, compositeRT, finalScene, quadCam, controls)
-    
-    // Render final result
+    if(controls.trailEnabled) {
+      compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, compositeRT, finalScene, quadCam, controls)
+    } else {
+      compositeToScreen(gl, finalMat, fboSource, bloomTex, paper, compositeRT, finalScene, quadCam, controls)
+    }
+
     gl.setRenderTarget(null)
     gl.clear()
     gl.render(finalScene, quadCam)
@@ -195,7 +206,10 @@ function createFinalMaterial({ bloomIntensity, finalColorOverlay, paperBlend, bl
       paper: { value: paper },
       finalColorOverlay: { value: new THREE.Color(finalColorOverlay) },
       paperBlend: { value: paperBlend },
-      bloomBlend: { value: bloomBlend }
+      bloomBlend: { value: bloomBlend },
+      paperEnabled: { value: true },
+      colorOverlayEnabled: { value: true },
+      bloomEnabled: { value: true }
     },
     vertexShader: /* glsl */ `varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position,1.);}`,
     fragmentShader: /* glsl */ `
@@ -205,14 +219,26 @@ function createFinalMaterial({ bloomIntensity, finalColorOverlay, paperBlend, bl
       uniform float intensity;
       uniform vec3 finalColorOverlay;
       uniform float paperBlend,bloomBlend;
+      uniform bool paperEnabled,colorOverlayEnabled,bloomEnabled;
       varying vec2 vUv;
       void main(){
         vec3 baseC = texture2D(base ,vUv).rgb;
-        vec3 bloomC= texture2D(bloom,vUv).rgb*intensity;
-        vec3 col = mix(baseC+bloomC, bloomC, bloomBlend);
-        vec3 paperC= texture2D(paper,vUv).rgb;
-        col = mix(col, BlendSoftLight(col,paperC), paperBlend);
-        col *= finalColorOverlay;
+        vec3 col = baseC;
+        
+        // Only apply bloom if bloom is enabled
+        if (bloomEnabled) {
+          vec3 bloomC = texture2D(bloom,vUv).rgb*intensity;
+          col = mix(baseC+bloomC, bloomC, bloomBlend);
+        }
+        
+        if (paperEnabled) {
+          vec3 paperC= texture2D(paper,vUv).rgb;
+          col = mix(col, BlendSoftLight(col,paperC), paperBlend);
+        }
+        
+        if (colorOverlayEnabled) {
+          col *= finalColorOverlay;
+        }
 
         float r = 0.0;//0.109;
         col = mix(col, vec3(1.0), step(vUv.x, r) + step(1.-r, vUv.x));
@@ -223,7 +249,7 @@ function createFinalMaterial({ bloomIntensity, finalColorOverlay, paperBlend, bl
 
       }`,
     depthTest: false, depthWrite: false,
-    toneMapped:true
+    toneMapped: true
   })
 }
 
@@ -288,6 +314,9 @@ function compositeToScreen(gl, finalMat, displayRT, bloomTex, paper, compositeRT
   finalMat.uniforms.finalColorOverlay.value.set(controls.finalColorOverlay)
   finalMat.uniforms.paperBlend.value = controls.paperBlend
   finalMat.uniforms.bloomBlend.value = controls.bloomBlend
+  finalMat.uniforms.paperEnabled.value = controls.paperEnabled
+  finalMat.uniforms.colorOverlayEnabled.value = controls.colorOverlayEnabled
+  finalMat.uniforms.bloomEnabled.value = controls.bloomEnabled
   gl.setRenderTarget(compositeRT)
   gl.clear()
   gl.render(finalScene, quadCam)
