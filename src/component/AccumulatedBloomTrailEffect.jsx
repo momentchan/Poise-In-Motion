@@ -9,6 +9,21 @@ import photoshopMath from '../r3f-gist/shader/cginc/photoshopMath.glsl?raw'
 export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
   /* ==== UI sliders =========================================== */
   const controls = useControls('Accumulated Bloom Trail Effect', {
+    Performance: folder({
+      dpr: { 
+        value: 1.5, 
+        min: 0.5, 
+        max: 2, 
+        step: 0.1, 
+        label: 'Effect DPR',
+        options: {
+          'Low (0.5)': 0.5,
+          'Medium (1.0)': 1,
+          'High (1.5)': 1.5,
+          'Ultra (2.0)': 2
+        }
+      }
+    }),
     Effects: folder({
       trailEnabled: { value: true, label: "Trail Effect" },
       bloomEnabled: { value: true, label: "Bloom Effect" },
@@ -36,7 +51,7 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
       paperBlend: { value: 0.3, min: 0, max: 1, step: 0.01 }
       // paperBlend: { value: 0.45, min: 0, max: 1, step: 0.01 }
     }),
-  })
+  }, { collapsed: true })
 
   /* ==== helpers ============================================== */
   const { gl, scene, camera, size } = useThree()
@@ -60,7 +75,8 @@ export default function AccumulatedBloomTrailEffect({ isPaused = false }) {
     stencilBuffer: false
   }), [])
 
-  const dpr = gl.getPixelRatio()
+  const dpr = controls.dpr
+  
   const fboSource = useFBO(size.width * dpr, size.height * dpr, fboParams)
   const trailA = useFBO(size.width * dpr, size.height * dpr, fboParams)
   const trailB = useFBO(size.width * dpr, size.height * dpr, fboParams)

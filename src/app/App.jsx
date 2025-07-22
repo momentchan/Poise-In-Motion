@@ -29,7 +29,7 @@ export default function App() {
     }, []);
  
     return <>
-        <Leva theme={customTheme} hidden={hidden} />  
+        <Leva theme={customTheme} hidden={hidden} collapsed={true} />  
 
         <Canvas
             shadows
