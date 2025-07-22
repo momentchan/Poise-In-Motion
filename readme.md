@@ -25,6 +25,7 @@ It leverages a multi-pass rendering approach to blend motion history, generate b
 - Three.js
 - React Three Fiber
 - GLSL Shaders
+- Vite
 
 ## Getting Started
 
