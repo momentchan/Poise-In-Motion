@@ -8,7 +8,7 @@ Poise in Motion is a real-time visual system that captures and visualizes the fl
 The system is built with React, Three.js, and a custom rendering pipeline using GLSL shaders.
 It leverages a multi-pass rendering approach to blend motion history, generate bloom effects, and apply surface textures, producing visuals that continuously evolve with time and interaction.
 
-<img src="Screenshot.png" alt="Poise in Motion" width="600" />
+<img src="Screenshot.png" alt="Poise in Motion" width="500" />   <img src="Demo.gif" alt="Poise in Motion" width="500" />
 
 ## Feature
 - Custom real-time rendering pipeline in Three.js
