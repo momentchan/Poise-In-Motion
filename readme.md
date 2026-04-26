@@ -4,6 +4,12 @@
 
 Poise in Motion is a real-time visual system that captures and visualizes the flow of movement across time, creating layered traces that overlap, shift, and dissolve — all rendered live in the browser.
 
+## 💡 Attribution
+If you use this project in your own work, please provide credit to the author. 
+
+**Author:** Ming-Jyun Hung  
+**Source:** [https://mingjyunhung.com/](https://mingjyunhung.com/)
+
 ## Overview
 The system is built with React, Three.js, and a custom rendering pipeline using GLSL shaders.
 It leverages a multi-pass rendering approach to blend motion history, generate bloom effects, and apply surface textures, producing visuals that continuously evolve with time and interaction.
